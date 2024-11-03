@@ -36,7 +36,7 @@ def interpreter(rawprog, ist=sys.stdin, ost=sys.stdout, dump=False):
         elif prog[ip] == '-':
             data[dp] = (data[dp] - 1) & 0xFF
         elif prog[ip] == '.':
-            print(chr(data[dp]), end='', file=ost)
+            print(chr(data[dp]), end='', file=ost, flush=True)
         elif prog[ip] == ',':
             data[dp] = ord(ist.read(1))
         elif prog[ip] == '[':
