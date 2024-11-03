@@ -340,3 +340,24 @@ class StackMachine:
         code += mvp(-rpos - 3)
         self.dp -= 2
         return code + '\n' if debug else code
+
+    def boolor(self, debug=False):
+        assert 1 < self.dp
+        code = 'or:' if debug else ''
+        code += '[-]>[-]<<<'
+        code += '[[-]>>+<<]'
+        code += '>[[-]>>+<<]'
+        code += '>>[-<+>]'
+        code += '<[[-]<<+>>]<'
+        return code + '\n' if debug else code
+
+    def booland(self, debug=False):
+        assert 1 < self.dp
+        code = 'and: ' if debug else ''
+        code += '[-]+>[-]+<<<'
+        code += '[[-]>>-<<]'
+        code += '>[[-]>>-<<]'
+        code += '>>[-<+>]'
+        code += '<<<+'
+        code += '>>[[-]<<->>]<'
+        return code

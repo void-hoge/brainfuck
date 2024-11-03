@@ -901,6 +901,34 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual(sm.dp, dp)
         self.assertEqual(f'{target} = {" * ".join(map(str, factor(target)))}\n', out)
 
+    def test_045_sm_boolor(self):
+        debug = False
+        dump = False
+        for x in range(2):
+            for y in range(2):
+                sm = StackMachine()
+                code = f'sm boolor {x} {y}\n'
+                code += sm.load_constant(x, debug)
+                code += sm.load_constant(y, debug)
+                code += sm.boolor()
+                out, dp, data = run(code, dump=dump)
+                self.assertEqual(1, dp)
+                self.assertEqual([int(bool(x) or bool(y)), 0, 0, 0], data)
+
+    def test_046_sm_booland(self):
+        debug = False
+        dump = False
+        for x in range(2):
+            for y in range(2):
+                sm = StackMachine()
+                code = f'sm booland {x} {y}\n'
+                code += sm.load_constant(x, debug)
+                code += sm.load_constant(y, debug)
+                code += sm.booland()
+                out, dp, data = run(code, dump=dump)
+                self.assertEqual(1, dp)
+                self.assertEqual([int(bool(x) and bool(y)), 0, 0, 0], data)
+
 
 if __name__ == '__main__':
     unittest.main()
