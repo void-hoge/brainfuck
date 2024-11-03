@@ -3,7 +3,7 @@
 import sys
 
 DUMPRANGE = 20
-STEPLIMIT = 1000000
+
 
 def interpreter(rawprog, ist=sys.stdin, ost=sys.stdout, dump=False):
     prog = ''.join([ch for ch in rawprog if ch != '\n'])
@@ -59,10 +59,11 @@ def interpreter(rawprog, ist=sys.stdin, ost=sys.stdout, dump=False):
                         maxdp = max(maxdp, dp)
                     elif prog[ip] == '[':
                         cnt -= 1
-        elif prog[ip] == '@': # breakpoint
+        elif prog[ip] == '@':  # breakpoint
             return dp, data[0 : maxdp + 1], step
         ip += 1
     return dp, data[0 : maxdp + 1], step
+
 
 if __name__ == '__main__':
     with open(sys.argv[1]) as f:

@@ -4,6 +4,9 @@ import unittest
 from stack_machine import *
 from interpreter import *
 import io
+import math
+
+TESTALL = False
 
 
 def run(code, input_string='', dump=False):
@@ -12,11 +15,12 @@ def run(code, input_string='', dump=False):
     print()
     print(code)
     dp, data, step = interpreter(code, ist, ost, dump)
-    print(f'Execution successfully finished in {step} steps.')
+    print(f'Halted after {step} steps of execution.')
     print(f'data: {data}')
     print(f'dp  : {dp}')
     print(f'out : {repr(ost.getvalue())}')
     return ost.getvalue(), dp, data
+
 
 class TestStackMachine(unittest.TestCase):
     def test_000_move_value1(self):
@@ -105,10 +109,26 @@ class TestStackMachine(unittest.TestCase):
         code += sm.load_constant(51)
         code += sm.multiply()
         out, dp, data = run(code)
-        self.assertEqual([255,0,0,0], data)
+        self.assertEqual([255, 0, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_010_sm_bool1(self):
+    def test_010_sm_add_sub_all(self):
+        if TESTALL:
+            for x in range(256):
+                for y in range(256):
+                    sm = StackMachine()
+                    code = f'sm add sub all {x} {y}\n'
+                    code += sm.load_constant(x)
+                    code += sm.load_constant(y)
+                    code += sm.add()
+                    code += sm.load_constant(x)
+                    code += sm.load_constant(y)
+                    code += sm.subtract()
+                    out, dp, data = run(code)
+                    self.assertEqual([(x + y) % 256, (x - y) % 256, 0, 0], data)
+                    self.assertEqual(2, dp)
+
+    def test_011_sm_bool1(self):
         sm = StackMachine()
         code = 'sm bool1\n'
         code += sm.load_constant(10)
@@ -117,7 +137,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([1, 0], data)
         self.assertEqual(1, dp)
 
-    def test_011_sm_bool2(self):
+    def test_012_sm_bool2(self):
         sm = StackMachine()
         code = 'sm bool2\n'
         code += sm.load_constant(0)
@@ -126,7 +146,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_012_sm_boolnot1(self):
+    def test_013_sm_boolnot1(self):
         sm = StackMachine()
         code = 'sm not1\n'
         code += sm.load_constant(0)
@@ -135,7 +155,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([1, 0], data)
         self.assertEqual(1, dp)
 
-    def test_013_sm_boolnot2(self):
+    def test_014_sm_boolnot2(self):
         sm = StackMachine()
         code = 'sm not2\n'
         code += sm.load_constant(10)
@@ -144,7 +164,20 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_014_sm_equal1(self):
+    def test_015_sm_bool_boolnot_all(self):
+        if TESTALL:
+            for x in range(256):
+                sm = StackMachine()
+                code = f'sm bool boolnot all {x}\n'
+                code += sm.load_constant(x)
+                code += sm.boolean()
+                code += sm.load_constant(x)
+                code += sm.boolnot()
+                out, dp, data = run(code)
+                self.assertEqual([int(bool(x)), int(not bool(x)), 0], data)
+                self.assertEqual(2, dp)
+
+    def test_016_sm_equal1(self):
         sm = StackMachine()
         code = 'sm equal1\n'
         code += sm.load_constant(10)
@@ -154,7 +187,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([1, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_015_sm_equal2(self):
+    def test_017_sm_equal2(self):
         sm = StackMachine()
         code = 'sm equal2\n'
         code += sm.load_constant(10)
@@ -164,7 +197,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([0, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_016_sm_equal1(self):
+    def test_018_sm_not_equal1(self):
         sm = StackMachine()
         code = 'sm neq1\n'
         code += sm.load_constant(10)
@@ -174,7 +207,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([0, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_017_sm_equal2(self):
+    def test_019_sm_not_equal2(self):
         sm = StackMachine()
         code = 'sm neq2\n'
         code += sm.load_constant(10)
@@ -184,7 +217,23 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([1, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_018_sm_put_character(self):
+    def test_020_sm_equal_notequal(self):
+        if TESTALL:
+            for x in range(256):
+                for y in range(256):
+                    sm = StackMachine()
+                    code = f'sm eq neq all {x} {y}\n'
+                    code += sm.load_constant(x)
+                    code += sm.load_constant(y)
+                    code += sm.equal()
+                    code += sm.load_constant(x)
+                    code += sm.load_constant(y)
+                    code += sm.notequal()
+                    out, dp, data = run(code)
+                    self.assertEqual([int(x == y), int(x != y), 0, 0], data)
+                    self.assertEqual(2, dp)
+
+    def test_021_sm_put_character(self):
         sm = StackMachine()
         code = 'sm putc\n'
         ch = '@'
@@ -195,7 +244,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual(0, 0)
         self.assertEqual(ch, out)
 
-    def test_019_sm_put_character(self):
+    def test_022_sm_put_character(self):
         sm = StackMachine()
         code = 'sm putc\n'
         ch = '@'
@@ -206,7 +255,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual(0, dp)
         self.assertEqual(ch, out)
 
-    def test_020_sm_get_character(self):
+    def test_023_sm_get_character(self):
         sm = StackMachine()
         code = 'sm getc\n'
         ch = '@'
@@ -215,7 +264,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([ord(ch), 0], data)
         self.assertEqual(1, dp)
 
-    def test_021_sm_while1(self):
+    def test_024_sm_while1(self):
         sm = StackMachine()
         code = 'sm while1\n'
         debug = False
@@ -226,7 +275,7 @@ class TestStackMachine(unittest.TestCase):
         code += sm.load_constant(ord('Z'), debug)
         code += sm.notequal(debug)
 
-        code += sm.beginwhile(debug)
+        code += sm.begin_while(debug)
         code += sm.load_variable(0, debug)
         code += sm.load_constant(1, debug)
         code += sm.add(debug)
@@ -236,7 +285,7 @@ class TestStackMachine(unittest.TestCase):
         code += sm.notequal(debug)
         code += sm.load_variable(0, debug)
         code += sm.put_character(debug)
-        code += sm.endwhile(debug)
+        code += sm.end_while(debug)
         code += sm.load_constant(ord('\n'), debug)
         code += sm.put_character(debug)
 
@@ -245,7 +294,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual(1, dp)
         self.assertEqual('ABCDEFGHIJKLMNOPQRSTUVWXYZ\n', out)
 
-    def test_022_sm_while2(self):
+    def test_025_sm_while2(self):
         sm = StackMachine()
         code = 'sm while2\n'
         debug = True
@@ -256,20 +305,20 @@ class TestStackMachine(unittest.TestCase):
         code += sm.load_constant(ord(ist[-1]), debug)
         code += sm.notequal(debug)
 
-        code += sm.beginwhile(debug)
+        code += sm.begin_while(debug)
         code += sm.get_character(debug)
         code += sm.load_variable(0, debug)
         code += sm.put_character(debug)
         code += sm.load_constant(ord(ist[-1]), debug)
         code += sm.notequal(debug)
-        code += sm.endwhile(debug)
+        code += sm.end_while(debug)
 
         out, dp, data = run(code, ist, dump=False)
         self.assertEqual([0, 0, 0], data)
         self.assertEqual(0, dp)
         self.assertEqual(ist, out)
 
-    def test_023_sm_while3(self):
+    def test_026_sm_while3(self):
         sm = StackMachine()
         code = 'sm while3\n'
         debug = False
@@ -280,14 +329,14 @@ class TestStackMachine(unittest.TestCase):
         code += sm.load_constant(25, debug)
         code += sm.notequal(debug)
 
-        code += sm.beginwhile(debug)
+        code += sm.begin_while(debug)
         code += sm.load_constant(0, debug)
         code += sm.store_variable(1, debug)
         code += sm.load_variable(1, debug)
         code += sm.load_constant(5, debug)
         code += sm.notequal(debug)
 
-        code += sm.beginwhile(debug)
+        code += sm.begin_while(debug)
         code += sm.load_variable(0, debug)
         code += sm.load_variable(1, debug)
         code += sm.add(debug)
@@ -301,7 +350,7 @@ class TestStackMachine(unittest.TestCase):
         code += sm.load_variable(1, debug)
         code += sm.load_constant(5, debug)
         code += sm.notequal(debug)
-        code += sm.endwhile(debug)
+        code += sm.end_while(debug)
 
         code += sm.load_constant(ord('\n'), debug)
         code += sm.put_character(debug)
@@ -312,14 +361,14 @@ class TestStackMachine(unittest.TestCase):
         code += sm.load_variable(0, debug)
         code += sm.load_constant(25, debug)
         code += sm.notequal(debug)
-        code += sm.endwhile(debug)
+        code += sm.end_while(debug)
 
         out, dp, data = run(code, dump=dump)
         self.assertEqual([25, 5, 0, 0, 0], data)
         self.assertEqual(2, dp)
         self.assertEqual('ABCDE\nFGHIJ\nKLMNO\nPQRST\nUVWXY\n', out)
 
-    def test_024_sm_greater_than1(self):
+    def test_027_sm_greater_than1(self):
         sm = StackMachine()
         code = 'sm gt1\n'
         debug = False
@@ -332,7 +381,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([int(x > y), 0, 0, 0, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_025_sm_greater_than2(self):
+    def test_028_sm_greater_than2(self):
         sm = StackMachine()
         code = 'sm gt2\n'
         debug = False
@@ -345,7 +394,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([int(x > y), 0, 0, 0, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_026_sm_greater_than3(self):
+    def test_029_sm_greater_than3(self):
         sm = StackMachine()
         code = 'sm gt3\n'
         debug = False
@@ -358,7 +407,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([int(x > y), 0, 0, 0, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_027_sm_greater_than4(self):
+    def test_030_sm_greater_than4(self):
         sm = StackMachine()
         code = 'sm gt4\n'
         debug = False
@@ -371,7 +420,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([int(x > y), 0, 0, 0, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_028_sm_less_than1(self):
+    def test_031_sm_less_than1(self):
         sm = StackMachine()
         code = 'sm lt1\n'
         debug = False
@@ -384,7 +433,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([int(x < y), 0, 0, 0, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_029_sm_less_than2(self):
+    def test_032_sm_less_than2(self):
         sm = StackMachine()
         code = 'sm lt2\n'
         debug = False
@@ -397,7 +446,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([int(x < y), 0, 0, 0, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_030_sm_less_than3(self):
+    def test_033_sm_less_than3(self):
         sm = StackMachine()
         code = 'sm lt1\n'
         debug = False
@@ -410,7 +459,7 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([int(x < y), 0, 0, 0, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_031_sm_less_than4(self):
+    def test_034_sm_less_than4(self):
         sm = StackMachine()
         code = 'sm lt2\n'
         debug = False
@@ -423,33 +472,435 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([int(x < y), 0, 0, 0, 0, 0], data)
         self.assertEqual(1, dp)
 
-    def test_032_sm_greater_or_equal_all(self):
-        for x in range(256):
-            for y in range(256):
-                sm = StackMachine()
-                code = f'sm ge all {x} {y}\n'
-                debug = False
-                dump = False
-                code += sm.load_constant(x, debug)
-                code += sm.load_constant(y, debug)
-                code += sm.greater_or_equal(debug)
-                out, dp, data = run(code, dump=dump)
-                self.assertEqual([int(x >= y), 0, 0, 0, 0, 0], data)
-                self.assertEqual(1, dp)
+    def test_035_sm_compare_all(self):
+        if TESTALL:
+            debug = False
+            dump = False
+            for x in range(256):
+                for y in range(256):
+                    sm = StackMachine()
+                    code = f'sm compare all {x} {y}\n'
+                    code += sm.load_constant(x, debug)
+                    code += sm.load_constant(y, debug)
+                    code += sm.greater_than(debug)
+                    code += sm.load_constant(x, debug)
+                    code += sm.load_constant(y, debug)
+                    code += sm.less_than(debug)
+                    code += sm.load_constant(x, debug)
+                    code += sm.load_constant(y, debug)
+                    code += sm.greater_or_equal(debug)
+                    code += sm.load_constant(x, debug)
+                    code += sm.load_constant(y, debug)
+                    code += sm.less_or_equal(debug)
+                    out, dp, data = run(code, dump=dump)
+                    self.assertEqual([int(x > y), int(x < y), int(x >= y), int(x <= y), 0, 0, 0, 0, 0], data)
+                    self.assertEqual(4, dp)
 
-    def test_033_sm_less_or_equal_all(self):
-        for x in range(256):
-            for y in range(256):
-                sm = StackMachine()
-                code = f'sm le all {x} {y}\n'
-                debug = False
-                dump = False
-                code += sm.load_constant(x, debug)
-                code += sm.load_constant(y, debug)
-                code += sm.less_or_equal(debug)
-                out, dp, data = run(code, dump=dump)
-                self.assertEqual([int(x <= y), 0, 0, 0, 0, 0], data)
-                self.assertEqual(1, dp)
+    def test_036_sm_modulo1(self):
+        sm = StackMachine()
+        code = 'sm mod1\n'
+        debug = False
+        dump = False
+        x, y = 20, 6
+        code += sm.load_constant(x, debug)
+        code += sm.load_constant(y, debug)
+        code += sm.modulo(debug)
+        out, dp, data = run(code, dump=dump)
+        self.assertEqual([int(x % y), 0, 0, 0, 0, 0, 0, 0], data)
+        self.assertEqual(1, dp)
+
+    def test_037_sm_divide1(self):
+        sm = StackMachine()
+        code = 'sm mod1\n'
+        debug = False
+        dump = False
+        x, y = 20, 6
+        code += sm.load_constant(x, debug)
+        code += sm.load_constant(y, debug)
+        code += sm.divide(debug)
+        out, dp, data = run(code, dump=dump)
+        self.assertEqual([int(x // y), 0, 0, 0, 0, 0, 0, 0, 0], data)
+        self.assertEqual(1, dp)
+
+    def test_038_sm_divmod_all(self):
+        if TESTALL:
+            for x in range(256):
+                for y in range(1, 256):
+                    sm = StackMachine()
+                    code = f'sm div mod all {x} {y}\n'
+                    debug = False
+                    dump = False
+                    code += sm.load_constant(x, debug)
+                    code += sm.load_constant(y, debug)
+                    code += sm.modulo(debug)
+                    code += sm.load_constant(x, debug)
+                    code += sm.load_constant(y, debug)
+                    code += sm.divide(debug)
+                    out, dp, data = run(code, dump=dump)
+                    self.assertEqual([int(x % y), int(x // y), 0, 0, 0, 0, 0, 0, 0, 0], data)
+                    self.assertEqual(2, dp)
+
+    def test_039_sm_if1(self):
+        debug = False
+        dump = False
+        sm = StackMachine()
+        code = 'sm if1\n'
+        code += sm.load_constant(1, debug)
+        code += sm.load_constant(10, debug)
+        code += sm.less_than(debug)
+        code += sm.begin_if(debug)
+        code += sm.load_constant(ord('T'), debug)
+        code += sm.put_character(debug)
+        code += sm.begin_else(debug)
+        code += sm.load_constant(ord('F'), debug)
+        code += sm.put_character(debug)
+        code += sm.end_if(debug)
+        out, dp, data = run(code, dump=dump)
+        self.assertEqual([0, 0, 0, 0, 0, 0], data)
+        self.assertEqual(0, dp)
+        self.assertEqual('T', out)
+        self.assertEqual(sm.dp, dp)
+
+    def test_040_sm_gcd1(self):
+        debug = False
+        dump = False
+        x, y = 36, 12
+        sm = StackMachine()
+        code = 'sm gcd1\n'
+        code += sm.load_constant(x, debug)
+        code += sm.load_constant(y, debug)
+        code += sm.load_variable(0, debug)
+        code += sm.begin_while(debug)
+        code += sm.load_variable(0, debug)
+        code += sm.load_variable(1, debug)
+        code += sm.less_than(debug)
+        code += sm.begin_if(debug)
+        code += sm.load_variable(0, debug)
+        code += sm.load_variable(1, debug)
+        code += sm.store_variable(0, debug)
+        code += sm.store_variable(1, debug)
+        code += sm.begin_else(debug)
+        code += sm.end_if(debug)
+        code += sm.load_variable(0, debug)
+        code += sm.load_variable(1, debug)
+        code += sm.subtract(debug)
+        code += sm.store_variable(0, debug)
+        code += sm.load_variable(0, debug)
+        code += sm.end_while(debug)
+        code += sm.load_variable(1, debug)
+        code += sm.load_constant(ord('0'), debug)
+        code += sm.add(debug)
+        code += sm.put_character(debug)
+        out, dp, data = run(code, dump=dump)
+        self.assertEqual([0, math.gcd(x, y), 0, 0, 0, 0, 0, 0], data)
+        self.assertEqual(sm.dp, dp)
+        self.assertEqual(dp, 2)
+        self.assertEqual(ord(out[0]), (math.gcd(x, y) + ord('0')) % 256)
+
+    def test_041_sm_gcd2(self):
+        debug = False
+        dump = False
+        x, y = 36, 12
+        sm = StackMachine()
+        code = 'sm gcd2\n'
+        code += sm.load_constant(x, debug)
+        code += sm.load_constant(y, debug)
+        code += sm.load_variable(0, debug)
+        code += sm.begin_while(debug)
+        code += sm.load_variable(1, debug)
+        code += sm.load_variable(0, debug)
+        code += sm.modulo(debug)
+        code += sm.store_variable(1, debug)
+        code += sm.load_variable(0, debug)
+        code += sm.load_variable(1, debug)
+        code += sm.store_variable(0, debug)
+        code += sm.store_variable(1, debug)
+        code += sm.load_variable(0, debug)
+        code += sm.end_while(debug)
+        code += sm.load_variable(1, debug)
+        code += sm.load_constant(ord('0'), debug)
+        code += sm.add(debug)
+        code += sm.put_character(debug)
+        out, dp, data = run(code, dump=dump)
+        self.assertEqual([0, math.gcd(x, y), 0, 0, 0, 0, 0, 0, 0, 0], data)
+        self.assertEqual(sm.dp, dp)
+        self.assertEqual(dp, 2)
+        self.assertEqual(ord(out[0]), (math.gcd(x, y) + ord('0')) % 256)
+
+    def test_042_sm_load_address(self):
+        debug = False
+        dump = False
+        sm = StackMachine()
+        length = 5
+        address = 4
+        code = f'sm la\n'
+        for i in range(length)[::-1]:
+            code += sm.load_constant(i, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(address, debug)
+        code += sm.load_address(length, debug)
+        out, dp, data = run(code, dump=dump)
+        self.assertEqual(list(range(length)[::-1]) + [0] * 4 + [address] + [0], data)
+        self.assertEqual(dp, length + 4 + 1)
+        self.assertEqual(dp, sm.dp)
+
+    def test_043_sm_store_address(self):
+        debug = False
+        dump = False
+        sm = StackMachine()
+        length = 5
+        address = 4
+        code = f'sm sa\n'
+        for i in range(length)[::-1]:
+            code += sm.load_constant(i, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(10, debug)
+        code += sm.load_constant(address, debug)
+        code += sm.store_address(length, debug)
+        out, dp, data = run(code, dump=dump)
+        arr = list(range(length)[::-1])
+        arr[-address - 1] = 10
+        arr += [0] * 4 + [0] * 3
+        self.assertEqual(arr, data)
+        self.assertEqual(length + 4, dp)
+        self.assertEqual(sm.dp, dp)
+
+    def test_044_sm_factor(self):
+        debug = False
+        dump = False
+        target = 192
+        assert target > 1
+        sm = StackMachine()
+        code = 'sm factor\n'
+        # initialize
+        for _ in range(10):
+            code += sm.load_constant(0, debug)
+        addr_ans = 10  # ans 10
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(0, debug)
+        addr_div = sm.dp
+        code += sm.load_constant(2, debug) # div 14
+        addr_target = sm.dp
+        code += sm.load_constant(0, debug) # target 15
+        code += sm.load_constant(1, debug)
+        code += sm.begin_while(debug)
+
+        # parse input
+        addr_in = sm.dp
+        code += sm.get_character(debug)
+        code += sm.load_variable(addr_in, debug)
+        code += sm.load_constant(ord('\n'), debug)
+        code += sm.notequal(debug)
+        code += sm.begin_if(debug)
+        code += sm.load_variable(addr_target, debug)
+        code += sm.load_constant(10, debug)
+        code += sm.multiply(debug)
+        code += sm.load_variable(addr_in, debug)
+        code += sm.load_constant(ord('0'), debug)
+        code += sm.subtract(debug)
+        code += sm.add(debug)
+        code += sm.store_variable(addr_target, debug)
+        code += sm.begin_else(debug)
+        code += sm.end_if(debug)
+        code += sm.load_constant(ord('\n'), debug)
+        code += sm.notequal(debug)
+        code += sm.end_while(debug)
+
+        # print target
+        code += sm.load_variable(addr_target, debug)
+        code += sm.load_constant(100, debug)
+        code += sm.greater_or_equal(debug)
+        code += sm.begin_if(debug)
+        code += sm.load_variable(addr_target, debug)
+        code += sm.load_constant(100, debug)
+        code += sm.divide(debug)
+        code += sm.load_constant(ord('0'), debug)
+        code += sm.add(debug)
+        code += sm.put_character()
+        code += sm.begin_else(debug)
+        code += sm.end_if(debug)
+
+        code += sm.load_variable(addr_target, debug)
+        code += sm.load_constant(10, debug)
+        code += sm.greater_or_equal(debug)
+        code += sm.begin_if(debug)
+        code += sm.load_variable(addr_target, debug)
+        code += sm.load_constant(100, debug)
+        code += sm.modulo(debug)
+        code += sm.load_constant(10, debug)
+        code += sm.divide(debug)
+        code += sm.load_constant(ord('0'), debug)
+        code += sm.add(debug)
+        code += sm.put_character()
+        code += sm.begin_else(debug)
+        code += sm.end_if(debug)
+
+        code += sm.load_variable(addr_target, debug)
+        code += sm.load_constant(1, debug)
+        code += sm.greater_or_equal(debug)
+        code += sm.begin_if(debug)
+        code += sm.load_variable(addr_target, debug)
+        code += sm.load_constant(10, debug)
+        code += sm.modulo(debug)
+        code += sm.load_constant(ord('0'), debug)
+        code += sm.add(debug)
+        code += sm.put_character()
+        code += sm.begin_else(debug)
+        code += sm.end_if(debug)
+
+        code += sm.load_constant(ord(' '), debug)
+        code += sm.put_character()
+        code += sm.load_constant(ord('='), debug)
+        code += sm.put_character()
+        code += sm.load_constant(ord(' '), debug)
+        code += sm.put_character()
+
+        # factorize
+        addr_idx = sm.dp
+        code += sm.load_constant(0, debug) # idx 16
+        code += sm.load_variable(addr_target, debug)
+        code += sm.load_constant(1, debug)
+        code += sm.notequal(debug)
+
+        code += sm.begin_while(debug)
+        code += sm.load_variable(addr_target, debug)
+        code += sm.load_variable(addr_div, debug)
+        code += sm.modulo(debug)
+
+        code += sm.begin_if(debug)
+        code += sm.load_variable(addr_div, debug)
+        code += sm.load_constant(1, debug)
+        code += sm.add()
+        code += sm.store_variable(addr_div, debug)
+
+        code += sm.begin_else(debug)
+
+        code += sm.load_variable(addr_target, debug)
+        code += sm.load_variable(addr_div, debug)
+        code += sm.divide(debug)
+        code += sm.store_variable(addr_target, debug)
+        code += sm.load_variable(addr_div, debug)
+        code += sm.load_variable(addr_idx, debug)
+        code += sm.store_address(addr_ans, debug)
+        code += sm.load_variable(addr_idx, debug)
+        code += sm.load_constant(1, debug)
+        code += sm.add(debug)
+        code += sm.store_variable(addr_idx, debug)
+        code += sm.end_if(debug)
+
+        code += sm.load_variable(addr_target, debug)
+        code += sm.load_constant(1, debug)
+        code += sm.notequal(debug)
+
+        code += sm.end_while(debug)
+
+        # print result
+        addr_acc = sm.dp
+        code += sm.load_constant(0, debug) # accessor
+        code += sm.load_variable(addr_acc, debug)
+        code += sm.load_variable(addr_idx, debug)
+        code += sm.less_than(debug)
+        
+        code += sm.begin_while(debug)
+
+        code += sm.load_variable(addr_acc, debug)
+        code += sm.load_address(addr_ans, debug)
+        code += sm.load_constant(100, debug)
+        code += sm.greater_or_equal(debug)
+        code += sm.begin_if(debug)
+        code += sm.load_variable(addr_acc, debug)
+        code += sm.load_address(addr_ans, debug)
+        code += sm.load_constant(100, debug)
+        code += sm.divide(debug)
+        code += sm.load_constant(ord('0'), debug)
+        code += sm.add(debug)
+        code += sm.put_character()
+        code += sm.begin_else(debug)
+        code += sm.end_if(debug)
+
+        code += sm.load_variable(addr_acc, debug)
+        code += sm.load_address(addr_ans, debug)
+        code += sm.load_constant(10, debug)
+        code += sm.greater_or_equal(debug)
+        code += sm.begin_if(debug)
+        code += sm.load_variable(addr_acc, debug)
+        code += sm.load_address(addr_ans, debug)
+        code += sm.load_constant(100, debug)
+        code += sm.modulo(debug)
+        code += sm.load_constant(10, debug)
+        code += sm.divide(debug)
+        code += sm.load_constant(ord('0'), debug)
+        code += sm.add(debug)
+        code += sm.put_character()
+        code += sm.begin_else(debug)
+        code += sm.end_if(debug)
+
+        code += sm.load_variable(addr_acc, debug)
+        code += sm.load_address(addr_ans, debug)
+        code += sm.load_constant(1, debug)
+        code += sm.greater_or_equal(debug)
+        code += sm.begin_if(debug)
+        code += sm.load_variable(addr_acc, debug)
+        code += sm.load_address(addr_ans, debug)
+        code += sm.load_constant(10, debug)
+        code += sm.modulo(debug)
+        code += sm.load_constant(ord('0'), debug)
+        code += sm.add(debug)
+        code += sm.put_character()
+        code += sm.begin_else(debug)
+        code += sm.end_if(debug)
+
+        code += sm.load_variable(addr_acc, debug)
+        code += sm.load_constant(1, debug)
+        code += sm.add(debug)
+        code += sm.store_variable(addr_acc, debug)
+
+        code += sm.load_variable(addr_acc, debug)
+        code += sm.load_variable(addr_idx, debug)
+        code += sm.notequal(debug)
+        code += sm.begin_if(debug)
+        code += sm.load_constant(ord(' '), debug)
+        code += sm.put_character(debug)
+        code += sm.load_constant(ord('*'), debug)
+        code += sm.put_character(debug)
+        code += sm.load_constant(ord(' '), debug)
+        code += sm.put_character(debug)
+        code += sm.begin_else(debug)
+        code += sm.end_if(debug)
+
+        code += sm.load_variable(addr_acc, debug)
+        code += sm.load_variable(addr_idx, debug)
+        code += sm.less_than(debug)
+        code += sm.end_while(debug)
+
+        code += sm.load_constant(ord('\n'), debug)
+        code += sm.put_character(debug)
+
+        ist = f'{target}\n'
+        out, dp, data = run(code, input_string=ist, dump=dump)
+
+        def factor(num):
+            ans = []
+            div = 2
+            while num != 1:
+                if num % div:
+                    div += 1
+                else:
+                    num = num // div
+                    ans += [div]
+            return ans
+
+        self.assertEqual(sm.dp, dp)
+        self.assertEqual(f'{target} = {" * ".join(map(str, factor(target)))}\n', out)
+
 
 if __name__ == '__main__':
     unittest.main()

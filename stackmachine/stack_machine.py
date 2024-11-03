@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
+
 def sanitize(num):
     if num < 0:
         return f'neg{-num}'
     else:
         return f'{num}'
+
 
 def mvp(num):
     '''move pointer'''
@@ -13,12 +15,14 @@ def mvp(num):
     else:
         return '>' * num
 
+
 def inc(num):
     '''increment'''
     if num < 0:
         return '-' * -num
     else:
         return '+' * num
+
 
 def multi_dst_add(dsts):
     assert dsts
@@ -67,7 +71,7 @@ class StackMachine:
     def load_variable(self, pos, debug=False):
         assert 0 <= pos < self.dp
         rpos = pos - self.dp
-        code = f'lv {sanitize(pos)}: ' if debug else ''
+        code = f'lv {pos}: ' if debug else ''
         code += '>[-]<'
         code += mvp(rpos)
         code += multi_dst_add([-rpos, -rpos + 1])
@@ -165,22 +169,22 @@ class StackMachine:
         self.dp += 1
         return code + '\n' if debug else code
 
-    def beginwhile(self, debug=False):
+    def begin_while(self, debug=False):
         assert 0 < self.dp
-        self.dp -= 1
         self.controlstack += [(('while'), self.dp)]
         code = 'beginwhile: ' if debug else ''
         code += '<[[-]'
+        self.dp -= 1
         return code + '\n' if debug else code
 
-    def endwhile(self, debug=False):
+    def end_while(self, debug=False):
         assert self.controlstack
         assert self.controlstack[-1][0] == 'while'
         assert self.controlstack[-1][1] <= self.dp
         _, dp = self.controlstack.pop()
         code = 'endwhile: ' if debug else ''
-        code += mvp(dp - self.dp) + ']'
-        self.dp = dp
+        code += mvp(dp - self.dp - 1) + ']'
+        self.dp = dp - 1
         return code + '\n' if debug else code
 
     def greater_than(self, debug=False):
@@ -188,20 +192,8 @@ class StackMachine:
         self.dp -= 1
         code = 'gt: ' if debug else ''
         code += '[-]>[-]+>[-]+>[-]'
-        code += '<<'
-        code += '['
-        code += '<<<'
-        code += '[>]>>+[[-]>]'
-        code += '<+<<<'
-        code += '-<-'
-        code += '>>>'
-        code += ']'
-        code += '>-'
-        code += '<<<+<+'
-        code += '>[-]<'
-        code += '[[-]>+<]'
-        code += '>'
-        code += '[-<+>]'
+        code += '<'
+        code += '[<<<<[>]>>>[->]<<<<-<->>>>]<[-]<<+[-]<+[[-]>+<]>[-<+>]'
         return code + '\n' if debug else code
 
     def less_than(self, debug=False):
@@ -209,18 +201,8 @@ class StackMachine:
         self.dp -= 1
         code = 'lt: ' if debug else ''
         code += '[-]>[-]+>[-]+>[-]'
-        code += '<<'
-        code += '['
-        code += '<<<'
-        code += '[>]>>+[[-]>]'
-        code += '<+<<<'
-        code += '-<-'
-        code += '>>>'
-        code += ']'
-        code += '>-'
-        code += '<<<+<+'
-        code += '[-]>'
-        code += '[[-]<+>]'
+        code += '<'
+        code += '[<<<<[>]>>>[->]<<<<-<->>>>]<[-]<<+<+[-]>[[-]<+>]'
         return code + '\n' if debug else code
 
     def greater_or_equal(self, debug=False):
@@ -235,4 +217,126 @@ class StackMachine:
         code = 'le: ' if debug else ''
         code += self.greater_than()
         code += self.boolnot()
+        return code + '\n' if debug else code
+
+    def modulo(self, debug=False):
+        assert 1 < self.dp
+        code = 'mod: ' if debug else ''
+        code += '<<'
+        code += multi_dst_add([2, 3])
+        code += '>>>'
+        code += multi_dst_add([-3])
+        code += '<<'
+        code += multi_dst_add([2, 3])
+        code += '>>>'
+        code += multi_dst_add([-3])
+        self.dp += 1
+        code += self.greater_or_equal()
+        code += '<'
+        code += '['
+        code += '-<[-<->>+>+<<]'
+        code += '>[-<+>]'
+        code += '<<[->>+>>+<<<<]'
+        code += '>>>>[-<<<<+>>>>]'
+        self.dp += 1
+        code += self.greater_or_equal()
+        code += '<]'
+        code += '<[-]'
+        self.dp -= 1
+        return code + '\n' if debug else code
+
+    def divide(self, debug=False):
+        assert 1 < self.dp
+        code = 'div: ' if debug else ''
+        code += '<<'
+        code += multi_dst_add([3, 4])
+        code += '>>>>'
+        code += multi_dst_add([-4])
+        code += '<<<'
+        code += multi_dst_add([3, 4])
+        code += '>>>>'
+        code += multi_dst_add([-4]) + ''
+        self.dp += 1
+        code += self.greater_or_equal()
+        code += '<'
+        code += '['
+        code += '-<+<[-<->>>+>+<<<]'
+        code += '>>[-<<+>>]'
+        code += '<<<[->>>+>>+<<<<<]'
+        code += '>>>>>[-<<<<<+>>>>>]'
+        self.dp += 1
+        code += self.greater_or_equal()
+        code += '<]'
+        code += '<<[-]<[-]'
+        code += '>>[-<<+>>]<'
+        self.dp -= 1
+        return code + '\n' if debug else code
+
+    def begin_if(self, debug=False):
+        assert 0 < self.dp
+        self.controlstack += [('if', self.dp)]
+        code = 'beginif: ' if debug else ''
+        code += '+<[[-]>->'
+        self.dp += 1
+        return code + '\n' if debug else code
+
+    def begin_else(self, debug=False):
+        assert self.controlstack
+        assert self.controlstack[-1][0] == 'if'
+        assert self.controlstack[-1][1] < self.dp
+        _, dp = self.controlstack.pop()
+        self.controlstack += [('else', dp)]
+        code = 'beginelse: ' if debug else ''
+        code += mvp(dp - self.dp - 1)
+        code += ']>[->'
+        self.dp = dp + 1
+        return code + '\n' if debug else code
+
+    def end_if(self, debug=False):
+        assert self.controlstack
+        assert self.controlstack[-1][0] == 'else'
+        assert self.controlstack[-1][1] < self.dp
+        _, dp = self.controlstack.pop()
+        code = 'endif: ' if debug else ''
+        code += mvp(dp - self.dp)
+        code += ']<'
+        self.dp = dp - 1
+        return code + '\n' if debug else code
+
+    def load_address(self, pos, debug=False):
+        '''pop and push data[pos - {top} - 1]'''
+        assert 0 < self.dp
+        assert 0 <= pos < self.dp
+        rpos = pos - self.dp
+        code = f'la {pos}: ' if debug else ''
+        code += mvp(rpos)
+        code += '[-]>[-]>[-]>[-]'
+        code += mvp(-rpos - 4)
+        code += multi_dst_add([rpos + 1])
+        code += mvp(rpos + 1)
+        code += '[<[->>>>+<<<<]>-[-<+>]>[-<+>]<+<]'
+        code += '<[->+>>+<<<]>[-<+>]>'
+        code += '[>[->+<]<-[->+<]>>>[-<<<<+>>>>]<<]'
+        code += '>'
+        code += multi_dst_add([-rpos - 3])
+        code += mvp(-rpos - 2)
+        return code + '\n' if debug else code
+
+    def store_address(self, pos, debug=False):
+        assert 1 < self.dp
+        assert 0 <= pos < self.dp
+        rpos = pos - self.dp
+        code = f'sa {pos}: ' if debug else ''
+        code += mvp(rpos)
+        code += '[-]>[-]>[-]>[-]'
+        code += mvp(-rpos - 5)
+        code += multi_dst_add([rpos + 4])
+        code += '>'
+        code += multi_dst_add([rpos + 1])
+        code += mvp(rpos + 1)
+        code += '[-<[->>>>+<<<<]>[-<+>]>[-<+>]>[-<+>]<<+<]'
+        code += '<[-]>>>[-<<<+>>>]<'
+        code += '[->>>[-<<<<+>>>>]<<<[->+<]>]'
+        code += mvp(-rpos - 3)
+        self.dp -= 2
         return code + '\n' if debug else code
