@@ -687,9 +687,9 @@ class TestStackMachine(unittest.TestCase):
         code += sm.load_constant(0, debug)
         code += sm.load_constant(0, debug)
         addr_div = sm.dp
-        code += sm.load_constant(2, debug) # div 14
+        code += sm.load_constant(2, debug)  # div 14
         addr_target = sm.dp
-        code += sm.load_constant(0, debug) # target 15
+        code += sm.load_constant(0, debug)  # target 15
         code += sm.load_constant(1, debug)
         code += sm.begin_while(debug)
 
@@ -765,7 +765,7 @@ class TestStackMachine(unittest.TestCase):
 
         # factorize
         addr_idx = sm.dp
-        code += sm.load_constant(0, debug) # idx 16
+        code += sm.load_constant(0, debug)  # idx 16
         code += sm.load_variable(addr_target, debug)
         code += sm.load_constant(1, debug)
         code += sm.notequal(debug)
@@ -804,11 +804,11 @@ class TestStackMachine(unittest.TestCase):
 
         # print result
         addr_acc = sm.dp
-        code += sm.load_constant(0, debug) # accessor
+        code += sm.load_constant(0, debug)  # accessor
         code += sm.load_variable(addr_acc, debug)
         code += sm.load_variable(addr_idx, debug)
         code += sm.less_than(debug)
-        
+
         code += sm.begin_while(debug)
 
         code += sm.load_variable(addr_acc, debug)
