@@ -1,0 +1,31 @@
+ans[10] = {};
+target = getint();
+div = 2;
+count = 0;
+putint(target);
+putchar(' ');
+putchar('=');
+putchar(' ');
+
+while (target != 1) {
+    if (target % div) {
+        div = div + 1;
+    } else {
+        target = target / div;
+        ans[count] = div;
+        count = count + 1;
+    }
+}
+
+idx = 0;
+while (idx < count) {
+    putint(ans[idx]);
+    idx = idx + 1;
+    if (idx != count) {
+        putchar(' ');
+        putchar('*');
+        putchar(' ');
+    }else {
+        putchar('\n');
+    }
+}
