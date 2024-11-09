@@ -8,17 +8,23 @@ class Token(IntEnum):
     ID        = auto() # abc
     INT       = auto() # 123
     CHAR      = auto() # 'a'
-    WHILE     = auto() # while
-    IF        = auto() # if
-    ELSE      = auto() # else
+    KW_WHILE  = auto() # while
+    KW_IF     = auto() # if
+    KW_ELSE   = auto() # else
     AND       = auto() # &
     OR        = auto() # |
+    NOT       = auto() # !
     PLUS      = auto() # +
     MINUS     = auto() # -
     STAR      = auto() # *
     SLASH     = auto() # /
     PERCENT   = auto() # %
     ASSIGN    = auto() # =
+    ADDASSIGN = auto() # +=
+    SUBASSIGN = auto() # -=
+    MULASSIGN = auto() # *=
+    DIVASSIGN = auto() # /=
+    MODASSIGN = auto() # %=
     EQ        = auto() # ==
     NEQ       = auto() # !=
     GT        = auto() # >
@@ -33,14 +39,17 @@ class Token(IntEnum):
     RBRACE    = auto() # }
     LBRACK    = auto() # [
     RBRACK    = auto() # ]
+    EOF       = auto()
 
 
 class LexicalAnalyzer:
     def __init__(self, string):
         self.string = string
         self.pos = 0
+        self.readingpos = 0
         self.tokens = []
         self.linecount = 0
+        self.analyze()
 
     def skipspace(self):
         while self.pos < len(self.string) and self.string[self.pos] in ' \n\t\r':
@@ -53,7 +62,11 @@ class LexicalAnalyzer:
             head = match.group(1)
             self.pos += len(head)
             if head in ['while', 'if', 'else']:
-                t = {'while': Token.WHILE, 'if': Token.IF, 'else': Token.ELSE}[head]
+                t = {
+                    'while': Token.KW_WHILE,
+                    'if': Token.KW_IF,
+                    'else': Token.KW_ELSE,
+                }[head]
                 return {
                     'type': t,
                     'val': None,
@@ -87,18 +100,24 @@ class LexicalAnalyzer:
                 'line': self.linecount,
                 'token': f"'{head}'"
             }
-        elif match := re.match(r'^(&|\||\+|-|\*|\/|%|==|!=|>=|<=|=|>|<|,|;|\(|\)|\{|\}|\[|\])', self.string[self.pos:]):
+        elif match := re.match(r'^(&|\||!=|!|\+=|\+|-=|-|\*=|\*|\/=|\/|%=|%|==|=|>=|<=|>|<|,|;|\(|\)|\{|\}|\[|\])', self.string[self.pos:]):
             head = match.group(1)
             self.pos += len(head)
             t = {
                 '&': Token.AND,
                 '|': Token.OR,
+                '!': Token.NOT,
                 '+': Token.PLUS,
                 '-': Token.MINUS,
                 '*': Token.STAR,
                 '/': Token.SLASH,
                 '%': Token.PERCENT,
                 '=': Token.ASSIGN,
+                '+=': Token.ADDASSIGN,
+                '-=': Token.SUBASSIGN,
+                '*=': Token.MULASSIGN,
+                '/=': Token.DIVASSIGN,
+                '%=': Token.MODASSIGN,
                 '==': Token.EQ,
                 '!=': Token.NEQ,
                 '>': Token.GT,
@@ -130,6 +149,24 @@ class LexicalAnalyzer:
         while token := self.get():
             self.skipspace()
             self.tokens += [token]
+        self.tokens += [{
+            'type': Token.EOF,
+            'val': None,
+            'line': self.linecount,
+            'token': None,
+        }]
+
+    def peek(self):
+        if self.readingpos < len(self.tokens):
+            return self.tokens[self.readingpos]
+        else:
+            return None
+
+    def seek(self):
+        self.readingpos += 1
+
+    def unseek(self):
+        self.readingpos -= 1
 
 if __name__ == '__main__':
     with open(sys.argv[1]) as f:

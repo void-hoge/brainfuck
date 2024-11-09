@@ -1,6 +1,6 @@
 a = 12;
 b = 36;
-while (a) {
+while (a != 0) {
     b %= a;
     swap(a, b);
 }
