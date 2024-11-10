@@ -343,12 +343,13 @@ class StackMachine:
 
     def boolor(self, debug=False):
         assert 1 < self.dp
-        code = 'or:' if debug else ''
+        code = 'or: ' if debug else ''
         code += '[-]>[-]<<<'
         code += '[[-]>>+<<]'
         code += '>[[-]>>+<<]'
         code += '>>[-<+>]'
         code += '<[[-]<<+>>]<'
+        self.dp -= 1
         return code + '\n' if debug else code
 
     def booland(self, debug=False):
@@ -360,4 +361,5 @@ class StackMachine:
         code += '>>[-<+>]'
         code += '<<<+'
         code += '>>[[-]<<->>]<'
+        self.dp -= 1
         return code

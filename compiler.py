@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-from lexical_analyzer import Token, LexicalAnalyzer
-from parser import *
+from lexical_analyzer import LexicalAnalyzer
+from parser import Parser
 from stack_machine import StackMachine
 
 class Compiler:
@@ -12,7 +12,7 @@ class Compiler:
         self.stackmachine = StackMachine()
 
     def codegen(self):
-        return self.prog.codegen(self.stackmachine, self.table)
+        return self.prog.codegen(self.stackmachine, self.table, debug=False)
 
 if __name__ == '__main__':
     import sys

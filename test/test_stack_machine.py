@@ -903,8 +903,8 @@ class TestStackMachine(unittest.TestCase):
     def test_045_sm_boolor(self):
         debug = False
         dump = False
-        for x in range(2):
-            for y in range(2):
+        for x in range(3):
+            for y in range(3):
                 sm = StackMachine()
                 code = f'sm boolor {x} {y}\n'
                 code += sm.load_constant(x, debug)
@@ -917,8 +917,8 @@ class TestStackMachine(unittest.TestCase):
     def test_046_sm_booland(self):
         debug = False
         dump = False
-        for x in range(2):
-            for y in range(2):
+        for x in range(3):
+            for y in range(3):
                 sm = StackMachine()
                 code = f'sm booland {x} {y}\n'
                 code += sm.load_constant(x, debug)

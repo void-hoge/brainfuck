@@ -1,5 +1,17 @@
 a = getint();
 b = getint();
+putchar('G');
+putchar('C');
+putchar('D');
+putchar('(');
+putint(a);
+putchar(',');
+putchar(' ');
+putint(b);
+putchar(')');
+putchar(' ');
+putchar('=');
+putchar(' ');
 while (a != 0) {
     b %= a;
     swap(a, b);

@@ -1,0 +1,25 @@
+num = 1;
+fizz = 0;
+buzz = 0;
+fizzbuzz = 0;
+while (num != 0) {
+    fizz = num % 3 == 0;
+    buzz = num % 5 == 0;
+    if (!(fizz | buzz)) {
+        putint(num);
+    }
+    if (fizz) {
+        putchar('F');
+        putchar('i');
+        putchar('z');
+        putchar('z');
+    }
+    if (buzz) {
+        putchar('B');
+        putchar('u');
+        putchar('z');
+        putchar('z');
+    }
+    putchar('\n');
+    num += 1;
+}
