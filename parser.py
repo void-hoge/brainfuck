@@ -5,6 +5,160 @@ from enum import IntEnum, auto
 from lexical_analyzer import Token, LexicalAnalyzer
 
 
+def indent(level):
+    return '    ' * level
+
+class Statement:
+    pass
+
+class StList(Statement):
+    def __init__(self, body):
+        self.body
+
+    def string(self, level):
+        return ''.join([f'{indent(level)}{st.string(level + 1)}\n' for st in self.body])
+
+class StIf(Statement):
+    def __init__(self, condition, body_then, body_else):
+        self.condition = condition
+        self.body_then = body_then
+        self.body_else = body_else
+
+    def string(self, level):
+        s = indent(level) + 'if {\n'
+        s += self.body_then.string(level + 1)
+        if not self.body_else:
+            s += indent(level) + '}\n'
+        else:
+            s += indent(level) + '} else {\n'
+            s += self.body_else.string(level + 1)
+            s += indent(level) + '}\n'
+        return s
+
+class StWhile(Statement):
+    def __init__(self, condition, body):
+        self.condition = condition
+        self.body = body
+
+    def string(self, level):
+        s = indent(level) + 'while {\n'
+        s += self.body.string(level + 1)
+        s += indent(level) + '}\n'
+        return s
+
+class StAssign(Statement):
+    def __init__(self, mode, left, right):
+        self.mode = mode
+        self.left = left
+        self.right = right
+
+    def string(self, level):
+        return f'{self.left} {self.mode} {self.right};\n'
+
+class StArrayInit(Statement):
+    def __init__(self, name, size):
+        self.name = name
+        self.size = size
+
+    def string(self, level):
+        return f'{self.name}[{self.string}];'
+
+class Expression:
+    pass
+
+class ExpCall(Expression):
+    def __init__(self, name, args):
+        self.name = name
+        self.args = args
+
+    def __str__(self):
+        return f'{self.name}({", ".join(map(str, self.args))})'
+
+class ExpArrayElement(Expression):
+    def __init__(self, name, index):
+        self.name = name
+        self.index = index
+
+    def __str__(self):
+        return f'{self.name}[{self.index}]'
+
+class ExpVariable(Expression):
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
+class ExpInteger(Expression):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return str(self.value)
+
+class ExpLogicalOr(Expression):
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+
+    def __str__(self):
+        return f'{self.left} | {self.right}'
+
+class ExpLogicalAnd(Expression):
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+
+    def __str__(self):
+        return f'{self.left} & {self.right}'
+
+class ExpEquality(Expression):
+    def __init__(self, mode, left, right):
+        self.mode = mode
+        self.left = left
+        self.right = right
+
+    def __str__(self):
+        return f'{self.left} {self.mode} {self.right}'
+
+class ExpRelatoinal(Expression):
+    def __init__(self, mode, left, right):
+        self.mode = mode
+        self.left = left
+        self.right = right
+
+    def __str__(self):
+        return f'{self.left} {self.mode} {self.right}'
+
+class ExpAdditive(Expression):
+    def __init__(self, mode, left, right):
+        self.mode = mode
+        self.left = left
+        self.right = right
+
+    def __str__(self):
+        return f'{self.left} {self.mode} {self.right}'
+
+class ExpMultiplicative(Expression):
+    def __init__(self, mode, left, right):
+        self.mode = mode
+        self.left = left
+        self.right = right
+
+    def __str__(self):
+        return f'{self.left} {self.mode} {self.right}'
+
+class ExpUnary(Expression):
+    def __init__(self, mode, operand):
+        self.mode = mode
+        self.operand = operand
+
+    def __str__(self):
+        if self.mode:
+            return f'{self.mode}{self.operand}'
+        else:
+            return f'{self.operand}'
+
 class Parser:
     def __init__(self, lex):
         self.lex = lex
@@ -111,12 +265,12 @@ class Parser:
         if not right_expression:
             raise SyntaxError(f'No matching assignment operators for {self.peek()}.')
         opmode = {
-            Token.ASSIGN: None,
-            Token.ADDASSIGN: '+',
-            Token.SUBASSIGN: '-',
-            Token.MULASSIGN: '*',
-            Token.DIVASSIGN: '/',
-            Token.MODASSIGN: '%',
+            Token.ASSIGN: '=',
+            Token.ADDASSIGN: '+=',
+            Token.SUBASSIGN: '-=',
+            Token.MULASSIGN: '*=',
+            Token.DIVASSIGN: '/=',
+            Token.MODASSIGN: '%=',
         }[token_type]
         return {
             'type': 'assign',
