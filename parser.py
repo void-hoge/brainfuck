@@ -13,21 +13,24 @@ class Statement:
 
 class StList(Statement):
     def __init__(self, body):
-        self.body
+        self.body = body
 
     def string(self, level):
-        return ''.join([f'{indent(level)}{st.string(level + 1)}\n' for st in self.body])
+        s = ''
+        for st in self.body:
+            s += st.string(level)
+        return s
 
 class StIf(Statement):
-    def __init__(self, condition, body_then, body_else):
+    def __init__(self, condition, body_then, body_else=None):
         self.condition = condition
         self.body_then = body_then
         self.body_else = body_else
 
     def string(self, level):
-        s = indent(level) + 'if {\n'
+        s = indent(level) + f'if ({self.condition}) {{\n'
         s += self.body_then.string(level + 1)
-        if not self.body_else:
+        if self.body_else == None:
             s += indent(level) + '}\n'
         else:
             s += indent(level) + '} else {\n'
@@ -41,7 +44,7 @@ class StWhile(Statement):
         self.body = body
 
     def string(self, level):
-        s = indent(level) + 'while {\n'
+        s = indent(level) + f'while ({self.condition}) {{\n'
         s += self.body.string(level + 1)
         s += indent(level) + '}\n'
         return s
@@ -53,7 +56,7 @@ class StAssign(Statement):
         self.right = right
 
     def string(self, level):
-        return f'{self.left} {self.mode} {self.right};\n'
+        return f'{indent(level)}{self.left} {self.mode} {self.right};\n'
 
 class StArrayInit(Statement):
     def __init__(self, name, size):
@@ -61,7 +64,14 @@ class StArrayInit(Statement):
         self.size = size
 
     def string(self, level):
-        return f'{self.name}[{self.string}];'
+        return f'{self.name}[{self.size}];\n'
+
+class StCall(Statement):
+    def __init__(self, name, args):
+        self.expr = ExpCall(name, args)
+
+    def string(self, level):
+        return f'{indent(level)}{self.expr};\n'
 
 class Expression:
     pass
@@ -96,13 +106,20 @@ class ExpInteger(Expression):
     def __str__(self):
         return str(self.value)
 
+class ExpCharacter(Expression):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(chr(self.value))
+
 class ExpLogicalOr(Expression):
     def __init__(self, left, right):
         self.left = left
         self.right = right
 
     def __str__(self):
-        return f'{self.left} | {self.right}'
+        return f'({self.left} | {self.right})'
 
 class ExpLogicalAnd(Expression):
     def __init__(self, left, right):
@@ -110,7 +127,7 @@ class ExpLogicalAnd(Expression):
         self.right = right
 
     def __str__(self):
-        return f'{self.left} & {self.right}'
+        return f'({self.left} & {self.right})'
 
 class ExpEquality(Expression):
     def __init__(self, mode, left, right):
@@ -119,16 +136,16 @@ class ExpEquality(Expression):
         self.right = right
 
     def __str__(self):
-        return f'{self.left} {self.mode} {self.right}'
+        return f'({self.left} {self.mode} {self.right})'
 
-class ExpRelatoinal(Expression):
+class ExpRelational(Expression):
     def __init__(self, mode, left, right):
         self.mode = mode
         self.left = left
         self.right = right
 
     def __str__(self):
-        return f'{self.left} {self.mode} {self.right}'
+        return f'({self.left} {self.mode} {self.right})'
 
 class ExpAdditive(Expression):
     def __init__(self, mode, left, right):
@@ -137,7 +154,7 @@ class ExpAdditive(Expression):
         self.right = right
 
     def __str__(self):
-        return f'{self.left} {self.mode} {self.right}'
+        return f'({self.left} {self.mode} {self.right})'
 
 class ExpMultiplicative(Expression):
     def __init__(self, mode, left, right):
@@ -146,7 +163,7 @@ class ExpMultiplicative(Expression):
         self.right = right
 
     def __str__(self):
-        return f'{self.left} {self.mode} {self.right}'
+        return f'({self.left} {self.mode} {self.right})'
 
 class ExpUnary(Expression):
     def __init__(self, mode, operand):
@@ -170,7 +187,7 @@ class Parser:
         statements = []
         while self.peek()['type'] not in [Token.EOF, Token.RBRACE]:
             statements.append(self.parse_statement())
-        return {'type': 'statement_list', 'body': statements}
+        return StList(statements)
 
     def parse_statement(self):
         if self.peek()['type'] == Token.KW_WHILE:
@@ -183,7 +200,7 @@ class Parser:
             self.expect(Token.ID)
             if self.peek()['type'] == Token.LPAREN:
                 self.unseek()
-                call = self.parse_inline_function_call()
+                call = self.parse_inline_function_call(asexp=False)
                 self.expect(Token.SEMICOLON)
                 return call
             else: # assign
@@ -204,14 +221,9 @@ class Parser:
         if self.peek()['type'] == Token.KW_ELSE:
             self.seek()
             self.expect(Token.LBRACE)
-            then_body = self.parse_statement_list()
+            body_else = self.parse_statement_list()
             self.expect(Token.RBRACE)
-        return {
-            'type': 'if',
-            'condition': condition,
-            'then': body_then,
-            'else': body_else,
-        }
+        return StIf(condition, body_then, body_else)
 
     def parse_statement_while(self):
         self.expect(Token.KW_WHILE)
@@ -221,13 +233,9 @@ class Parser:
         self.expect(Token.LBRACE)
         body = self.parse_statement_list()
         self.expect(Token.RBRACE)
-        return {
-            'type': 'while',
-            'condition': condition,
-            'body': body,
-        }
+        return StWhile(condition, body)
 
-    def parse_inline_function_call(self):
+    def parse_inline_function_call(self, asexp=False):
         function_name = self.peek()['token']
         self.expect(Token.ID)
         self.expect(Token.LPAREN)
@@ -238,22 +246,18 @@ class Parser:
                 if not self.match(Token.COMMA):
                     break
             self.expect(Token.RPAREN)
-        return {
-            'type': 'inline_function_call',
-            'name': function_name,
-            'arguments': arguments
-        }
+        if asexp:
+            return ExpCall(function_name, arguments)
+        else:
+            return StCall(function_name, arguments)
 
     def parse_assignment(self):
         left_expression = self.parse_left_expression()
-        if left_expression['type'] == 'array_element' and \
+        if isinstance(left_expression, ExpArrayElement) and \
            self.peek()['type'] == Token.SEMICOLON:
-            return {
-                'type': 'array_initialization',
-                'name': left_expression['name'],
-                'size': left_expression['index']
-            }
+            return StArrayInit(left_expression.name, left_expression.index)
         right_expression = None
+        token = self.peek()
         for token_type in [Token.ASSIGN, Token.ADDASSIGN, Token.SUBASSIGN,
                            Token.MULASSIGN, Token.DIVASSIGN, Token.MODASSIGN]:
             try:
@@ -264,20 +268,7 @@ class Parser:
                 continue
         if not right_expression:
             raise SyntaxError(f'No matching assignment operators for {self.peek()}.')
-        opmode = {
-            Token.ASSIGN: '=',
-            Token.ADDASSIGN: '+=',
-            Token.SUBASSIGN: '-=',
-            Token.MULASSIGN: '*=',
-            Token.DIVASSIGN: '/=',
-            Token.MODASSIGN: '%=',
-        }[token_type]
-        return {
-            'type': 'assign',
-            'mode': opmode,
-            'left': left_expression,
-            'right': right_expression
-        }
+        return StAssign(token['token'], left_expression, right_expression)
 
     def parse_left_expression(self):
         token = self.peek()
@@ -287,12 +278,12 @@ class Parser:
                 self.seek()
                 index_expr = self.parse_expression()
                 self.expect(Token.RBRACK)
-                return {'type': 'array_element', 'name': token['token'], 'index': index_expr}
+                return ExpArrayElement(token['token'], index_expr)
             elif self.peek()['type'] == Token.LPAREN:
                 self.unseek()
                 return None
             else:
-                return {'type': 'variable', 'name': token['token']}
+                return ExpVariable(token['token'])
 
     def parse_expression(self):
         return self.parse_logical_or_expression()
@@ -303,7 +294,7 @@ class Parser:
             operator = self.peek()
             self.seek()
             right = self.parse_logical_and_expression()
-            left = {'type': 'logical', 'operator': operator['token'], 'left': left, 'right': right}
+            left = ExpLogicalOr(left, right)
         return left
 
     def parse_logical_and_expression(self):
@@ -312,7 +303,7 @@ class Parser:
             operator = self.peek()
             self.seek()
             right = self.parse_equality_expression()
-            left = {'type': 'logical', 'operator': operator['token'], 'left': left, 'right': right}
+            left = ExpLogicalAnd(left, right)
         return left
 
     def parse_equality_expression(self):
@@ -321,7 +312,7 @@ class Parser:
             operator = self.peek()
             self.seek()
             right = self.parse_relational_expression()
-            left = {'type': 'logical', 'operator': operator['token'], 'left': left, 'right': right}
+            left = ExpEquality(operator['token'], left, right)
         return left
 
     def parse_relational_expression(self):
@@ -330,7 +321,7 @@ class Parser:
             operator = self.peek()
             self.seek()
             right = self.parse_additive_expression()
-            left = {'type': 'logical', 'operator': operator['token'], 'left': left, 'right': right}
+            left = ExpRelational(operator['token'], left, right)
         return left
 
     def parse_additive_expression(self):
@@ -339,7 +330,7 @@ class Parser:
             operator = self.peek()
             self.seek()
             right = self.parse_multiplicative_expression()
-            left = {'type': 'logical', 'operator': operator['token'], 'left': left, 'right': right}
+            left = ExpAdditive(operator['token'], left, right)
         return left
 
     def parse_multiplicative_expression(self):
@@ -348,7 +339,7 @@ class Parser:
             operator = self.peek()
             self.seek()
             right = self.parse_unary_expression()
-            left = {'type': 'logical', 'operator': operator['token'], 'left': left, 'right': right}
+            left = ExpMultiplicative(operator['token'], left, right)
         return left
 
     def parse_unary_expression(self):
@@ -356,7 +347,7 @@ class Parser:
             operator = self.peek()
             self.seek()
             operand = self.parse_unary_expression()
-            return {'type': 'unary', 'operator': operator['token'], 'operand': operand}
+            return ExpUnary(operator['token'], operand)
         else:
             return self.parse_primary_expression()
 
@@ -366,22 +357,22 @@ class Parser:
             self.seek()
             if self.peek()['type'] == Token.LPAREN:
                 self.unseek()
-                return self.parse_inline_function_call()
+                return self.parse_inline_function_call(asexp=True)
             elif self.peek()['type'] == Token.LBRACK:
                 self.seek()
                 index_expr = self.parse_expression()
                 self.expect(Token.RBRACK)
-                return {'type': 'array_element', 'name': token['token'], 'index': index_expr}
+                return ExpArrayElement(token['token'], index_expr)
             else:
-                return {'type': 'variable', 'name': token['token']}
+                return ExpVariable(token['token'])
         elif self.peek()['type'] == Token.INT:
             value = self.peek()['val']
             self.seek()
-            return {'type': 'integer', 'value': value}
+            return ExpInteger(value)
         elif self.peek()['type'] == Token.CHAR:
             value = self.peek()['val']
             self.seek()
-            return {'type': 'character', 'value': value}
+            return ExpCharacter(value)
         elif self.peek()['type'] == Token.LPAREN:
             self.seek()
             expr = self.parse_expression()
@@ -420,4 +411,4 @@ if __name__ == '__main__':
     lex = LexicalAnalyzer(prog)
     lex.analyze()
     parser = Parser(lex)
-    print(parser.parse_program())
+    print(parser.parse_program().string(0))
