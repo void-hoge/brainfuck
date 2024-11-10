@@ -1,7 +1,8 @@
-a = 12;
-b = 36;
+a = getint();
+b = getint();
 while (a != 0) {
     b %= a;
     swap(a, b);
 }
 putint(b);
+putchar('\n');

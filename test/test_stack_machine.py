@@ -690,10 +690,9 @@ class TestStackMachine(unittest.TestCase):
         code += sm.load_constant(2, debug)  # div 14
         addr_target = sm.dp
         code += sm.load_constant(0, debug)  # target 15
+        # parse input
         code += sm.load_constant(1, debug)
         code += sm.begin_while(debug)
-
-        # parse input
         addr_in = sm.dp
         code += sm.get_character(debug)
         code += sm.load_variable(addr_in, debug)
