@@ -190,8 +190,7 @@ class ExpCall(Expression):
     def inline_getchar(self, sm, table, debug=False):
         if self.args:
             raise SemanticError(f'Inline function "getchar" takes no arguments, but entered "{self.args}"')
-        code += sm.get_character(debug)
-        return code
+        return sm.get_character(debug)
 
     def inline_putint(self, sm, table, debug=False):
         if len(self.args) != 1:
@@ -310,9 +309,9 @@ class ExpArrayElement(Expression):
         return f'{self.name}[{self.index}]'
 
     def codegen(self, sm, table, debug=False):
-        if not table.get(self.args[0].name, None):
+        if not table.get(self.name, None):
             raise SemanticError(f'Undefined variable/array: {self.name}')
-        if table[self.name]['type'] != 'variable':
+        if table[self.name]['type'] == 'variable':
             raise SemanticError(f'"{self.name}" is not an array but a variable.')
         arrelm = table[self.name]
         code = self.index.codegen(sm, table, debug)
