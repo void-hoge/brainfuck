@@ -28,10 +28,10 @@ class StList(Statement):
             s += st.string(level)
         return s
 
-    def codegen(self, sm, table, debug=False):
+    def codegen(self, sm, tables, debug=False):
         code = ''
         for st in self.body:
-            code += st.codegen(sm, table, debug)
+            code += st.codegen(sm, tables, debug)
         return code
 
 
@@ -52,13 +52,13 @@ class StIf(Statement):
             s += indent(level) + '}\n'
         return s
 
-    def codegen(self, sm, table, debug=False):
-        code = self.condition.codegen(sm, table, debug)
+    def codegen(self, sm, tables, debug=False):
+        code = self.condition.codegen(sm, tables, debug)
         code += sm.begin_if(debug)
-        code += self.body_then.codegen(sm, table, debug)
+        code += self.body_then.codegen(sm, tables, debug)
         code += sm.begin_else(debug)
         if self.body_else:
-            code += self.body_else.codegen(sm, table, debug)
+            code += self.body_else.codegen(sm, tables, debug)
         code += sm.end_if(debug)
         return code
 
@@ -74,11 +74,11 @@ class StWhile(Statement):
         s += indent(level) + '}\n'
         return s
 
-    def codegen(self, sm, table, debug=False):
-        code = self.condition.codegen(sm, table, debug)
+    def codegen(self, sm, tables, debug=False):
+        code = self.condition.codegen(sm, tables, debug)
         code += sm.begin_while(debug)
-        code += self.body.codegen(sm, table, debug)
-        code += self.condition.codegen(sm, table, debug)
+        code += self.body.codegen(sm, tables, debug)
+        code += self.condition.codegen(sm, tables, debug)
         code += sm.end_while(debug)
         return code
 
@@ -92,58 +92,57 @@ class StAssign(Statement):
     def string(self, level):
         return f'{indent(level)}{self.left} {self.mode} {self.right};\n'
 
-    def codegen(self, sm, table, debug=False):
+    def codegen(self, sm, tables, debug=False):
         code = ''
+        var = next((table[self.left.name] for table in tables[::-1] if self.left.name in table), None)
         if isinstance(self.left, ExpVariable):
-            if table.get(self.left.name, None):
+            if var:
                 # store
-                var = table[self.left.name]
                 if self.mode == '+=':
                     code += sm.load_variable(var['pos'])
-                    code += self.right.codegen(sm, table, debug)
+                    code += self.right.codegen(sm, tables, debug)
                     code += sm.add(debug)
                     code += sm.store_variable(var['pos'], debug)
                 elif self.mode == '-=':
                     code += sm.load_variable(var['pos'], debug)
-                    code += self.right.codegen(sm, table, debug)
+                    code += self.right.codegen(sm, tables, debug)
                     code += sm.subtract(debug)
                     code += sm.store_variable(var['pos'], debug)
                 elif self.mode == '*=':
                     code += sm.load_variable(var['pos'], debug)
-                    code += self.right.codegen(sm, table, debug)
+                    code += self.right.codegen(sm, tables, debug)
                     code += sm.multiply(debug)
                     code += sm.store_variable(var['pos'], debug)
                 elif self.mode == '/=':
                     code += sm.load_variable(var['pos'], debug)
-                    code += self.right.codegen(sm, table, debug)
+                    code += self.right.codegen(sm, tables, debug)
                     code += sm.divide(debug)
                     code += sm.store_variable(var['pos'], debug)
                 elif self.mode == '%=':
                     code += sm.load_variable(var['pos'], debug)
-                    code += self.right.codegen(sm, table, debug)
+                    code += self.right.codegen(sm, tables, debug)
                     code += sm.modulo(debug)
                     code += sm.store_variable(var['pos'], debug)
                 else:  # self.mode == '=':
-                    code += self.right.codegen(sm, table, debug)
+                    code += self.right.codegen(sm, tables, debug)
                     code += sm.store_variable(var['pos'], debug)
             else:
                 # new
                 if sm.controlstack:
                     raise SemanticError(f'Variable "{self.left.name}" must be in the global scope.')
                 if self.mode != '=':
-                    raise SemanticError(f'Undefined lhs expression: {self.name}')
-                table[self.left.name] = {'type': 'variable', 'pos': sm.dp}
-                code += self.right.codegen(sm, table, debug)
+                    raise SemanticError(f'Undefined variable: {self.name}')
+                tables[-1][self.left.name] = {'type': 'variable', 'pos': sm.dp, 'size': 1}
+                code += self.right.codegen(sm, tables, debug)
         else:  # isinstance(self.left, ArrayElement):
             # store only
-            array = table.get(self.left.name, None)
-            if not array:
-                raise SemanticError(f'Undefined lhs expression: {self.left.name}')
-            if array['type'] != 'array':
+            if not var:
+                raise SemanticError(f'Undefined array: {self.left.name}')
+            if var['type'] != 'array':
                 raise SemanticError(f'"{self.left.name}" is not an array.')
-            code += self.right.codegen(sm, table, debug)
-            code += self.left.index.codegen(sm, table, debug)
-            code += sm.store_address(array['pos'], debug)
+            code += self.right.codegen(sm, tables, debug)
+            code += self.left.index.codegen(sm, tables, debug)
+            code += sm.store_address(var['pos'], debug)
         return code
 
 
@@ -155,12 +154,12 @@ class StArrayInit(Statement):
     def string(self, level):
         return f'{self.name}[{self.size}];\n'
 
-    def codegen(self, sm, table, debug=False):
+    def codegen(self, sm, tables, debug=False):
         if sm.controlstack:
             raise SemanticError(f'Variable "{self.left.name}" must be in the global scope.')
         code = ''
         size = self.size.evaluate()
-        table[self.name] = {'type': 'array', 'pos': sm.dp + size}
+        tables[-1][self.name] = {'type': 'array', 'pos': sm.dp + size}
         for _ in range(size + 4):
             code += sm.load_constant(0, debug)
         return code
@@ -173,8 +172,8 @@ class StCall(Statement):
     def string(self, level):
         return f'{indent(level)}{self.expr};\n'
 
-    def codegen(self, sm, table, debug=False):
-        return self.expr.codegen(sm, table, debug)
+    def codegen(self, sm, tables, debug=False):
+        return self.expr.codegen(sm, tables, debug)
 
 
 class Expression:
@@ -189,24 +188,24 @@ class ExpCall(Expression):
     def __str__(self):
         return f'{self.name}({", ".join(map(str, self.args))})'
 
-    def inline_putchar(self, sm, table, debug=False):
+    def inline_putchar(self, sm, tables, debug=False):
         if len(self.args) != 1:
             raise SemanticError(f'Inline function "putchar" takes only one argument, but entered "{self.args}".')
         code = ''
-        code += self.args[0].codegen(sm, table, debug)
+        code += self.args[0].codegen(sm, tables, debug)
         code += sm.put_character(debug)
         return code
 
-    def inline_getchar(self, sm, table, debug=False):
+    def inline_getchar(self, sm, tables, debug=False):
         if self.args:
             raise SemanticError(f'Inline function "getchar" takes no arguments, but entered "{self.args}"')
         return sm.get_character(debug)
 
-    def inline_putint(self, sm, table, debug=False):
+    def inline_putint(self, sm, tables, debug=False):
         if len(self.args) != 1:
             raise SemanticError(f'Inline function "putint" takes only one argument, but entered "{self.args}".')
         target = sm.dp
-        code = self.args[0].codegen(sm, table, debug)
+        code = self.args[0].codegen(sm, tables, debug)
         code += sm.load_variable(target, debug)
         code += sm.load_constant(100, debug)
         code += sm.greater_or_equal(debug)
@@ -242,7 +241,7 @@ class ExpCall(Expression):
         code += sm.put_character(debug)
         return code
 
-    def inline_getint(self, sm, table, debug=False):
+    def inline_getint(self, sm, tables, debug=False):
         if self.args:
             raise SemanticError(f'Inline function "getint" takes no arguments, but entered "{self.args}"')
         pos = sm.dp
@@ -270,7 +269,7 @@ class ExpCall(Expression):
         code += sm.end_while(debug)
         return code
 
-    def inline_swap(self, sm, table, debug=False):
+    def inline_swap(self, sm, tables, debug=False):
         if len(self.args) != 2:
             raise SemanticError(f'Inline function "swap" takes two arguments, but entered "{self.args}"')
         if (
@@ -280,37 +279,37 @@ class ExpCall(Expression):
             and not isinstance(self.args[1], ExpArrayElement)
         ):
             raise SemanticError(f'Arguments of "swap" must be an instance of "ExpVariable" or "ExpArrayElement"')
-        if not table.get(self.args[0].name, None):
+        first = next((table[self.args[0].name] for table in tables[::-1] if self.args[0].name in table), None)
+        second = next((table[self.args[1].name] for table in tables[::-1] if self.args[1].name in table), None)
+        if not first:
             raise SemanticError(f'Undefined variable/array: {self.args[0].name}')
-        if not table.get(self.args[1].name, None):
+        if not second:
             raise SemanticError(f'Undefined variable/array: {self.args[1].name}')
-        code = self.args[0].codegen(sm, table, debug)
-        code += self.args[1].codegen(sm, table, debug)
-        first = table[self.args[0].name]
-        second = table[self.args[1].name]
+        code = self.args[0].codegen(sm, tables, debug)
+        code += self.args[1].codegen(sm, tables, debug)
         if isinstance(self.args[0], ExpVariable):
             code += sm.store_variable(first['pos'], debug)
         else:
-            code += self.args[0].index.codegen(sm, table, debug)
+            code += self.args[0].index.codegen(sm, tables, debug)
             code += sm.store_address(first['pos'], debug)
         if isinstance(self.args[1], ExpVariable):
             code += sm.store_variable(second['pos'], debug)
         else:
-            code += self.args[1].index.codegen(sm, table, debug)
+            code += self.args[1].index.codegen(sm, tables, debug)
             code += sm.store_address(second['pos'], debug)
         return code
 
-    def codegen(self, sm, table, debug=False):
+    def codegen(self, sm, tables, debug=False):
         if self.name == 'putchar':
-            return self.inline_putchar(sm, table, debug)
+            return self.inline_putchar(sm, tables, debug)
         elif self.name == 'getchar':
-            return self.inline_getchar(sm, table, debug)
+            return self.inline_getchar(sm, tables, debug)
         elif self.name == 'putint':
-            return self.inline_putint(sm, table, debug)
+            return self.inline_putint(sm, tables, debug)
         elif self.name == 'getint':
-            return self.inline_getint(sm, table, debug)
+            return self.inline_getint(sm, tables, debug)
         elif self.name == 'swap':
-            return self.inline_swap(sm, table, debug)
+            return self.inline_swap(sm, tables, debug)
         else:
             raise SyntaxError(f'No matching inline funcions: {self.name}')
 
@@ -323,13 +322,13 @@ class ExpArrayElement(Expression):
     def __str__(self):
         return f'{self.name}[{self.index}]'
 
-    def codegen(self, sm, table, debug=False):
-        if not table.get(self.name, None):
+    def codegen(self, sm, tables, debug=False):
+        arrelm = next((table[self.name] for table in tables[::-1] if self.name in table), None)
+        if not arrelm:
             raise SemanticError(f'Undefined variable/array: {self.name}')
-        if table[self.name]['type'] == 'variable':
+        if arrelm['type'] == 'variable':
             raise SemanticError(f'"{self.name}" is not an array but a variable.')
-        arrelm = table[self.name]
-        code = self.index.codegen(sm, table, debug)
+        code = self.index.codegen(sm, tables, debug)
         code += sm.load_address(arrelm['pos'], debug)
         return code
 
@@ -341,12 +340,12 @@ class ExpVariable(Expression):
     def __str__(self):
         return self.name
 
-    def codegen(self, sm, table, debug=False):
-        if not table.get(self.name, None):
+    def codegen(self, sm, tables, debug=False):
+        var = next((table[self.name] for table in tables[::-1] if self.name in table), None)
+        if not var:
             raise SemanticError(f'Undefined variable/array: {self.name}')
-        if table[self.name]['type'] != 'variable':
+        if var['type'] != 'variable':
             raise SemanticError(f'"{self.name}" is not a variable but an array.')
-        var = table[self.name]
         return sm.load_variable(var['pos'], debug)
 
 
@@ -360,7 +359,7 @@ class ExpInteger(Expression):
     def evaluate(self):
         return self.value & 0xFF
 
-    def codegen(self, sm, table, debug=False):
+    def codegen(self, sm, tables, debug=False):
         return sm.load_constant(self.value, debug)
 
 
@@ -374,7 +373,7 @@ class ExpCharacter(Expression):
     def evaluate(self):
         return self.value & 0xFF
 
-    def codegen(self, sm, table, debug=False):
+    def codegen(self, sm, tables, debug=False):
         return sm.load_constant(self.value, debug)
 
 
@@ -389,10 +388,10 @@ class ExpLogicalOr(Expression):
     def evaluate(self):
         return int(int(self.left.evaluate()) | int(self.right.evaluate()))
 
-    def codegen(self, sm, table, debug=False):
+    def codegen(self, sm, tables, debug=False):
         code = ''
-        code += self.left.codegen(sm, table, debug)
-        code += self.right.codegen(sm, table, debug)
+        code += self.left.codegen(sm, tables, debug)
+        code += self.right.codegen(sm, tables, debug)
         code += sm.boolor(debug)
         return code
 
@@ -408,10 +407,10 @@ class ExpLogicalAnd(Expression):
     def evaluate(self):
         return int(int(self.left.evaluate()) & int(self.right.evaluate()))
 
-    def codegen(self, sm, table, debug=False):
+    def codegen(self, sm, tables, debug=False):
         code = ''
-        code += self.left.codegen(sm, table, debug)
-        code += self.right.codegen(sm, table, debug)
+        code += self.left.codegen(sm, tables, debug)
+        code += self.right.codegen(sm, tables, debug)
         code += sm.booland(debug)
         return code
 
@@ -433,9 +432,9 @@ class ExpEquality(Expression):
         else:
             return int(left != right)
 
-    def codegen(self, sm, table, debug=False):
-        code = self.left.codegen(sm, table, debug)
-        code += self.right.codegen(sm, table, debug)
+    def codegen(self, sm, tables, debug=False):
+        code = self.left.codegen(sm, tables, debug)
+        code += self.right.codegen(sm, tables, debug)
         if self.mode == '==':
             code += sm.equal(debug)
         else:
@@ -464,9 +463,9 @@ class ExpRelational(Expression):
         else:  # self.mode == '>=':
             return int(left >= right)
 
-    def codegen(self, sm, table, debug=False):
-        code = self.left.codegen(sm, table, debug)
-        code += self.right.codegen(sm, table, debug)
+    def codegen(self, sm, tables, debug=False):
+        code = self.left.codegen(sm, tables, debug)
+        code += self.right.codegen(sm, tables, debug)
         if self.mode == '<':
             code += sm.less_than(debug)
         elif self.mode == '>':
@@ -495,9 +494,9 @@ class ExpAdditive(Expression):
         else:  # self.mode == '-'
             return int(left - right) & 0xFF
 
-    def codegen(self, sm, table, debug=False):
-        code = self.left.codegen(sm, table, debug)
-        code += self.right.codegen(sm, table, debug)
+    def codegen(self, sm, tables, debug=False):
+        code = self.left.codegen(sm, tables, debug)
+        code += self.right.codegen(sm, tables, debug)
         if self.mode == '+':
             code += sm.add(debug)
         else:  # self.mode == '-':
@@ -524,9 +523,9 @@ class ExpMultiplicative(Expression):
         else:  # self.mode == '%'
             return int(left % right) & 0xFF
 
-    def codegen(self, sm, table, debug=False):
-        code = self.left.codegen(sm, table, debug)
-        code += self.right.codegen(sm, table, debug)
+    def codegen(self, sm, tables, debug=False):
+        code = self.left.codegen(sm, tables, debug)
+        code += self.right.codegen(sm, tables, debug)
         if self.mode == '*':
             code += sm.multiply(debug)
         elif self.mode == '/':
@@ -555,18 +554,18 @@ class ExpUnary(Expression):
         else:  # +
             return int(bool(self.operand.evaluate())) & 0xFF
 
-    def codegen(self, sm, table, debug=False):
+    def codegen(self, sm, tables, debug=False):
         code = ''
         if self.mode == '!':
-            code += self.operand.codegen(sm, table, debug)
+            code += self.operand.codegen(sm, tables, debug)
             code += sm.boolean(debug)
             code += sm.boolnot(debug)
         elif self.mode == '-':
             code += sm.load_constant(0, debug)
-            code += self.operand.codegen(sm, table, debug)
+            code += self.operand.codegen(sm, tables, debug)
             code += sm.subtract(debug)
         else:  # self.mode == '+'
-            code += self.operand.codegen(sm, table, debug)
+            code += self.operand.codegen(sm, tables, debug)
         return code
 
 

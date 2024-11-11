@@ -9,11 +9,11 @@ class Compiler:
     def __init__(self, text):
         parser = Parser(LexicalAnalyzer(text))
         self.prog = parser.parse_program()
-        self.table = {}
+        self.tables = [{}]
         self.stackmachine = StackMachine()
 
     def codegen(self):
-        return self.prog.codegen(self.stackmachine, self.table, debug=False)
+        return self.prog.codegen(self.stackmachine, self.tables, debug=False)
 
 
 if __name__ == '__main__':
