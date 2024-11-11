@@ -199,7 +199,12 @@ class StCall(Statement):
         return f'{indent(level)}{self.expr};\n'
 
     def codegen(self, sm, tables, debug=False):
-        return self.expr.codegen(sm, tables, debug)
+        begin = sm.dp
+        code = self.expr.codegen(sm, tables, debug)
+        end = sm.dp
+        assert begin <= end
+        code += sm.pop(end - begin, debug)
+        return code
 
 
 class Expression:
