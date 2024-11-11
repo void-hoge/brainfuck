@@ -129,7 +129,7 @@ class StAssign(Statement):
             if var:
                 # store
                 if self.mode == '+=':
-                    code += sm.load_variable(var['pos'])
+                    code += sm.load_variable(var['pos'], debug)
                     code += self.right.codegen(sm, tables, debug)
                     code += sm.add(debug)
                     code += sm.store_variable(var['pos'], debug)
