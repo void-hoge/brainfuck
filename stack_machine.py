@@ -371,3 +371,19 @@ class StackMachine:
         code += '<[-]' * amount
         self.dp -= amount
         return code + '\n' if debug else code
+
+    def push_array(self, size, debug=False):
+        code = 'initarr: ' if debug else ''
+        code += mvp(size + 4)
+        self.dp += size + 4
+        return code + '\n' if debug else code
+
+    def clean(self, begin, end, debug=False):
+        assert 0 <= begin
+        assert begin <= end
+        assert end <= self.dp
+        code = 'clean: ' if debug else ''
+        code += mvp(begin - self.dp)
+        code += '[-]>' * (end - begin)
+        code += mvp(self.dp - end)
+        return code + '\n' if debug else code

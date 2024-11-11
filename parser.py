@@ -75,12 +75,12 @@ class StWhile(Statement):
         return s
 
     def codegen(self, sm, tables, debug=False):
-        scope, code, body = self.analyze_scope_variables(sm, tables, debug)
+        scope, code = self.analyze_scope_variables(sm, tables, debug)
         size = sum(var['size'] for name, var in scope.items())
         code += self.condition.codegen(sm, tables, debug)
         tables += [scope]
         code += sm.begin_while(debug)
-        code += body.codegen(sm, tables, debug)
+        code += self.body.codegen(sm, tables, debug)
         code += self.condition.codegen(sm, tables, debug)
         code += sm.end_while(debug)
         code += sm.pop(size, debug)
@@ -90,10 +90,8 @@ class StWhile(Statement):
     def analyze_scope_variables(self, sm, tables, debug):
         scope = {}
         code = ''
-        body = []
         for statement in self.body.body:
             if isinstance(statement, StAssign):
-                body += [statement]
                 name = statement.left.name
                 var = next((table[name] for table in tables[::-1] if name in table), None)
                 if not var:
@@ -105,12 +103,9 @@ class StWhile(Statement):
                 if arr:
                     raise SemanticError(f'Array "{name}" is already exists.')
                 size = statement.size.evaluate()
-                scope[name] = {'type': 'array', 'pos': sm.dp + size, 'size': size + 4}
-                for _ in range(size + 4):
-                    code += sm.load_constant(0, debug)
-            else:
-                body += [statement]
-        return scope, code, StList(body)
+                scope[name] = {'type': 'array', 'pos': sm.dp + size, 'size': size}
+                code += statement.allocate(sm, debug)
+        return scope, code
 
 
 class StAssign(Statement):
@@ -183,11 +178,15 @@ class StArrayInit(Statement):
         return f'{self.name}[{self.size}];\n'
 
     def codegen(self, sm, tables, debug=False):
-        code = ''
+        array = tables[-1][self.name]
+        begin = array['pos'] - array['size']
+        end = array['pos'] + 4
+        code = sm.clean(begin, end, debug)
+        return code
+
+    def allocate(self, sm, debug=False):
         size = self.size.evaluate()
-        tables[-1][self.name] = {'type': 'array', 'pos': sm.dp + size}
-        for _ in range(size + 4):
-            code += sm.load_constant(0, debug)
+        code = sm.push_array(size, debug)
         return code
 
 

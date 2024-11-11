@@ -928,6 +928,19 @@ class TestStackMachine(unittest.TestCase):
                 self.assertEqual(1, dp)
                 self.assertEqual([int(bool(x) and bool(y)), 0, 0, 0], data)
 
+    def test_047_sm_clean(self):
+        debug = False
+        dump = False
+        sm = StackMachine()
+        code = ''
+        begin, end = 10, 20
+        for i in range(end):
+            code += sm.load_constant(i, debug)
+        code += sm.clean(10, 20, debug)
+        out, dp, data = run(code, dump=dump)
+        self.assertEqual(20, dp)
+        self.assertEqual(list(range(10)) + [0] * 11, data)
+
 
 if __name__ == '__main__':
     unittest.main()

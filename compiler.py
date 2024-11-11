@@ -12,14 +12,19 @@ class Compiler:
         self.tables = [{}]
         self.stackmachine = StackMachine()
 
-    def codegen(self):
-        return self.prog.codegen(self.stackmachine, self.tables, debug=False)
+    def codegen(self, debug=False):
+        return self.prog.codegen(self.stackmachine, self.tables, debug)
 
 
 if __name__ == '__main__':
     import sys
-
     with open(sys.argv[1]) as f:
         prog = f.read()
+    debug = False
     comp = Compiler(prog)
-    print(comp.codegen())
+    code = comp.codegen(debug)
+    if debug:
+        print(code)
+    else:
+        for i in range(0, len(code), 80):
+            print(code[i:i+80])
