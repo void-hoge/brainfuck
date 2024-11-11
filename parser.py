@@ -83,7 +83,7 @@ class StWhile(Statement):
         code += body.codegen(sm, tables, debug)
         code += self.condition.codegen(sm, tables, debug)
         code += sm.end_while(debug)
-        code += sm.pop(size)
+        code += sm.pop(size, debug)
         tables.pop()
         return code
 
@@ -102,8 +102,8 @@ class StWhile(Statement):
             elif isinstance(statement, StArrayInit):
                 name = statement.name
                 arr = next((table[name] for table in tables[::-1] if name in table), None)
-                if not arr:
-                    raise SemanticError(f'Array {name} is already exists.')
+                if arr:
+                    raise SemanticError(f'Array "{name}" is already exists.')
                 size = statement.size.evaluate()
                 scope[name] = {'type': 'array', 'pos': sm.dp + size, 'size': size + 4}
                 for _ in range(size + 4):
@@ -158,8 +158,6 @@ class StAssign(Statement):
                     code += sm.store_variable(var['pos'], debug)
             else:
                 # new
-                # if sm.controlstack:
-                #     raise SemanticError(f'Variable "{self.left.name}" must be in the global scope.')
                 if self.mode != '=':
                     raise SemanticError(f'Undefined variable: {self.name}')
                 tables[-1][self.left.name] = {'type': 'variable', 'pos': sm.dp, 'size': 1}
@@ -185,8 +183,6 @@ class StArrayInit(Statement):
         return f'{self.name}[{self.size}];\n'
 
     def codegen(self, sm, tables, debug=False):
-        # if sm.controlstack:
-        #     raise SemanticError(f'Variable "{self.left.name}" must be in the global scope.')
         code = ''
         size = self.size.evaluate()
         tables[-1][self.name] = {'type': 'array', 'pos': sm.dp + size}
