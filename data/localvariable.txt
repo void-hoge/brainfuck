@@ -1,7 +1,11 @@
-i = 10;
-while (i) {
-    a = 'a';
-    putchar(a);
-    i -= 1;
+i = 0;
+while (i < 5) {
+    j = 0;
+    while (j < 5) {
+        putchar('A' + i * 5 + j);
+        putchar(' ');
+        j += 1;
+    }
+    putchar('\n');
+    i += 1;
 }
-

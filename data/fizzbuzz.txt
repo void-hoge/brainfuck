@@ -1,11 +1,9 @@
 num = 1;
-fizz = 0;
-buzz = 0;
-fizzbuzz = 0;
 while (num != 0) {
     fizz = num % 3 == 0;
     buzz = num % 5 == 0;
-    if (!(fizz | buzz)) {
+    nofizzbuzz = !(fizz | buzz);
+    if (nofizzbuzz) {
         putint(num);
     }
     if (fizz) {
