@@ -183,6 +183,7 @@ class StackMachine:
         assert self.controlstack[-1][1] <= self.dp
         _, dp = self.controlstack.pop()
         code = 'endwhile: ' if debug else ''
+        # code += '<[-]' * (self.dp - dp + 1) + ']'
         code += mvp(dp - self.dp - 1) + ']'
         self.dp = dp - 1
         return code + '\n' if debug else code
@@ -362,4 +363,12 @@ class StackMachine:
         code += '<<<+'
         code += '>>[[-]<<->>]<'
         self.dp -= 1
-        return code
+        return code + '\n' if debug else ''
+
+    def pop(self, amount, debug=False):
+        assert 0 < self.dp
+        assert 0 <= amount
+        code = 'pop: ' if debug else ''
+        code += '<[-]' * amount
+        self.dp -= 1
+        return code + '\n' if debug else code
