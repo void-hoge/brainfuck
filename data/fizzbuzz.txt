@@ -18,6 +18,7 @@ while (num != 0) {
         putchar('z');
         putchar('z');
     }
-    putchar('\n');
+    putchar(' ');
     num += 1;
 }
+putchar('\n');

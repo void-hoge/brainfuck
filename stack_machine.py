@@ -180,11 +180,9 @@ class StackMachine:
     def end_while(self, debug=False):
         assert self.controlstack
         assert self.controlstack[-1][0] == 'while'
-        print(self.controlstack[-1][1], self.dp)
         assert self.controlstack[-1][1] == self.dp
         _, dp = self.controlstack.pop()
         code = 'endwhile: ' if debug else ''
-        # code += '<[-]' * (self.dp - dp + 1) + ']'
         code += '<]'
         self.dp = dp - 1
         return code + '\n' if debug else code
@@ -289,7 +287,7 @@ class StackMachine:
         _, dp = self.controlstack.pop()
         self.controlstack += [('else', dp)]
         code = 'beginelse: ' if debug else ''
-        code += mvp(dp - self.dp - 1)
+        code += '[-]<' * (self.dp - dp + 1)
         code += ']>[->'
         self.dp = dp + 1
         return code + '\n' if debug else code
@@ -300,7 +298,7 @@ class StackMachine:
         assert self.controlstack[-1][1] < self.dp
         _, dp = self.controlstack.pop()
         code = 'endif: ' if debug else ''
-        code += mvp(dp - self.dp)
+        code += '[-]<' * (self.dp - dp)
         code += ']<'
         self.dp = dp - 1
         return code + '\n' if debug else code
