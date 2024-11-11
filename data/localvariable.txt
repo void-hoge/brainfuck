@@ -1,0 +1,7 @@
+i = 10;
+while (i) {
+    a = 'a';
+    putchar(a);
+    i -= 1;
+}
+

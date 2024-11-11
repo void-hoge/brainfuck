@@ -5,14 +5,18 @@ from enum import IntEnum, auto
 from lexical_analyzer import Token, LexicalAnalyzer
 from stack_machine import *
 
+
 def indent(level):
     return '    ' * level
+
 
 class SemanticError(SyntaxError):
     pass
 
+
 class Statement:
     pass
+
 
 class StList(Statement):
     def __init__(self, body):
@@ -29,6 +33,7 @@ class StList(Statement):
         for st in self.body:
             code += st.codegen(sm, table, debug)
         return code
+
 
 class StIf(Statement):
     def __init__(self, condition, body_then, body_else=None):
@@ -77,6 +82,7 @@ class StWhile(Statement):
         code += sm.end_while(debug)
         return code
 
+
 class StAssign(Statement):
     def __init__(self, mode, left, right):
         self.mode = mode
@@ -117,7 +123,7 @@ class StAssign(Statement):
                     code += self.right.codegen(sm, table, debug)
                     code += sm.modulo(debug)
                     code += sm.store_variable(var['pos'], debug)
-                else: #self.mode == '=':
+                else:  # self.mode == '=':
                     code += self.right.codegen(sm, table, debug)
                     code += sm.store_variable(var['pos'], debug)
             else:
@@ -128,7 +134,7 @@ class StAssign(Statement):
                     raise SemanticError(f'Undefined lhs expression: {self.name}')
                 table[self.left.name] = {'type': 'variable', 'pos': sm.dp}
                 code += self.right.codegen(sm, table, debug)
-        else: # isinstance(self.left, ArrayElement):
+        else:  # isinstance(self.left, ArrayElement):
             # store only
             array = table.get(self.left.name, None)
             if not array:
@@ -139,6 +145,7 @@ class StAssign(Statement):
             code += self.left.index.codegen(sm, table, debug)
             code += sm.store_address(array['pos'], debug)
         return code
+
 
 class StArrayInit(Statement):
     def __init__(self, name, size):
@@ -158,6 +165,7 @@ class StArrayInit(Statement):
             code += sm.load_constant(0, debug)
         return code
 
+
 class StCall(Statement):
     def __init__(self, name, args):
         self.expr = ExpCall(name, args)
@@ -168,8 +176,10 @@ class StCall(Statement):
     def codegen(self, sm, table, debug=False):
         return self.expr.codegen(sm, table, debug)
 
+
 class Expression:
     pass
+
 
 class ExpCall(Expression):
     def __init__(self, name, args):
@@ -263,8 +273,12 @@ class ExpCall(Expression):
     def inline_swap(self, sm, table, debug=False):
         if len(self.args) != 2:
             raise SemanticError(f'Inline function "swap" takes two arguments, but entered "{self.args}"')
-        if not isinstance(self.args[0], ExpVariable) and not isinstance(self.args[0], ExpArrayElement) or \
-           not isinstance(self.args[1], ExpVariable) and not isinstance(self.args[1], ExpArrayElement):
+        if (
+            not isinstance(self.args[0], ExpVariable)
+            and not isinstance(self.args[0], ExpArrayElement)
+            or not isinstance(self.args[1], ExpVariable)
+            and not isinstance(self.args[1], ExpArrayElement)
+        ):
             raise SemanticError(f'Arguments of "swap" must be an instance of "ExpVariable" or "ExpArrayElement"')
         if not table.get(self.args[0].name, None):
             raise SemanticError(f'Undefined variable/array: {self.args[0].name}')
@@ -300,6 +314,7 @@ class ExpCall(Expression):
         else:
             raise SyntaxError(f'No matching inline funcions: {self.name}')
 
+
 class ExpArrayElement(Expression):
     def __init__(self, name, index):
         self.name = name
@@ -318,6 +333,7 @@ class ExpArrayElement(Expression):
         code += sm.load_address(arrelm['pos'], debug)
         return code
 
+
 class ExpVariable(Expression):
     def __init__(self, name):
         self.name = name
@@ -333,6 +349,7 @@ class ExpVariable(Expression):
         var = table[self.name]
         return sm.load_variable(var['pos'], debug)
 
+
 class ExpInteger(Expression):
     def __init__(self, value):
         self.value = value
@@ -346,6 +363,7 @@ class ExpInteger(Expression):
     def codegen(self, sm, table, debug=False):
         return sm.load_constant(self.value, debug)
 
+
 class ExpCharacter(Expression):
     def __init__(self, value):
         self.value = value
@@ -358,6 +376,7 @@ class ExpCharacter(Expression):
 
     def codegen(self, sm, table, debug=False):
         return sm.load_constant(self.value, debug)
+
 
 class ExpLogicalOr(Expression):
     def __init__(self, left, right):
@@ -377,6 +396,7 @@ class ExpLogicalOr(Expression):
         code += sm.boolor(debug)
         return code
 
+
 class ExpLogicalAnd(Expression):
     def __init__(self, left, right):
         self.left = left
@@ -394,6 +414,7 @@ class ExpLogicalAnd(Expression):
         code += self.right.codegen(sm, table, debug)
         code += sm.booland(debug)
         return code
+
 
 class ExpEquality(Expression):
     def __init__(self, mode, left, right):
@@ -421,6 +442,7 @@ class ExpEquality(Expression):
             code += sm.notequal(debug)
         return code
 
+
 class ExpRelational(Expression):
     def __init__(self, mode, left, right):
         self.mode = mode
@@ -439,7 +461,7 @@ class ExpRelational(Expression):
             return int(left > right)
         elif self.mode == '<=':
             return int(left <= right)
-        else: # self.mode == '>=':
+        else:  # self.mode == '>=':
             return int(left >= right)
 
     def codegen(self, sm, table, debug=False):
@@ -451,9 +473,10 @@ class ExpRelational(Expression):
             code += sm.greater_than(debug)
         elif self.mode == '<=':
             code += sm.less_or_equal(debug)
-        else: # self.mode == '>=':
+        else:  # self.mode == '>=':
             code += sm.greater_or_equal(debug)
         return code
+
 
 class ExpAdditive(Expression):
     def __init__(self, mode, left, right):
@@ -469,7 +492,7 @@ class ExpAdditive(Expression):
         right = int(self.right.evaluate())
         if self.mode == '+':
             return int(left + right) & 0xFF
-        else: # self.mode == '-'
+        else:  # self.mode == '-'
             return int(left - right) & 0xFF
 
     def codegen(self, sm, table, debug=False):
@@ -477,9 +500,10 @@ class ExpAdditive(Expression):
         code += self.right.codegen(sm, table, debug)
         if self.mode == '+':
             code += sm.add(debug)
-        else: # self.mode == '-':
+        else:  # self.mode == '-':
             code += sm.subtract(debug)
         return code
+
 
 class ExpMultiplicative(Expression):
     def __init__(self, mode, left, right):
@@ -497,7 +521,7 @@ class ExpMultiplicative(Expression):
             return int(left * right) & 0xFF
         elif self.mode == '/':
             return int(left // right) & 0xFF
-        else: # self.mode == '%'
+        else:  # self.mode == '%'
             return int(left % right) & 0xFF
 
     def codegen(self, sm, table, debug=False):
@@ -507,9 +531,10 @@ class ExpMultiplicative(Expression):
             code += sm.multiply(debug)
         elif self.mode == '/':
             code += sm.divide(debug)
-        else: # self.mode == '%'
+        else:  # self.mode == '%'
             code += sm.modulo(debug)
         return code
+
 
 class ExpUnary(Expression):
     def __init__(self, mode, operand):
@@ -527,7 +552,7 @@ class ExpUnary(Expression):
             return int(not bool(self.operand.evaluate())) & 0xFF
         elif self.mode == '-':
             return (255 - self.operand.evaluate()) & 0xFF
-        else: # +
+        else:  # +
             return int(bool(self.operand.evaluate())) & 0xFF
 
     def codegen(self, sm, table, debug=False):
@@ -540,9 +565,10 @@ class ExpUnary(Expression):
             code += sm.load_constant(0, debug)
             code += self.operand.codegen(sm, table, debug)
             code += sm.subtract(debug)
-        else: # self.mode == '+'
+        else:  # self.mode == '+'
             code += self.operand.codegen(sm, table, debug)
         return code
+
 
 class Parser:
     def __init__(self, lex):
@@ -571,7 +597,7 @@ class Parser:
                 call = self.parse_inline_function_call(asexp=False)
                 self.expect(Token.SEMICOLON)
                 return call
-            else: # assign
+            else:  # assign
                 self.unseek()
                 assign = self.parse_assignment()
                 self.expect(Token.SEMICOLON)
@@ -621,13 +647,18 @@ class Parser:
 
     def parse_assignment(self):
         left_expression = self.parse_left_expression()
-        if isinstance(left_expression, ExpArrayElement) and \
-           self.peek()['type'] == Token.SEMICOLON:
+        if isinstance(left_expression, ExpArrayElement) and self.peek()['type'] == Token.SEMICOLON:
             return StArrayInit(left_expression.name, left_expression.index)
         right_expression = None
         token = self.peek()
-        for token_type in [Token.ASSIGN, Token.ADDASSIGN, Token.SUBASSIGN,
-                           Token.MULASSIGN, Token.DIVASSIGN, Token.MODASSIGN]:
+        for token_type in [
+            Token.ASSIGN,
+            Token.ADDASSIGN,
+            Token.SUBASSIGN,
+            Token.MULASSIGN,
+            Token.DIVASSIGN,
+            Token.MODASSIGN,
+        ]:
             try:
                 self.expect(token_type)
                 right_expression = self.parse_expression()
@@ -772,8 +803,10 @@ class Parser:
             return True
         return False
 
+
 if __name__ == '__main__':
     import sys
+
     with open(sys.argv[1]) as f:
         prog = f.read()
     lex = LexicalAnalyzer(prog)
