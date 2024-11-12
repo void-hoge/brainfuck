@@ -1,15 +1,14 @@
 num = 2;
-while (num != 0) {
+for (num = 2; num != 0; num += 1) {
     factors[7];
     div = 2;
     count = 0;
-    target = num;
-    putint(target);
+    putint(num);
     putchar(' ');
     putchar('=');
     putchar(' ');
-    
-    while (target != 1) {
+
+    for (target = num; target != 1;) {
         if (target % div) {
             div += 1;
         } else {
@@ -18,12 +17,10 @@ while (num != 0) {
             count += 1;
         }
     }
-    
-    idx = 0;
-    while (idx < count) {
-        putint(factors[idx]);
-        idx += 1;
-        if (idx != count) {
+
+    for (i = 0; i < count; i += 1) {
+        putint(factors[i]);
+        if (i + 1 != count) {
             putchar(' ');
             putchar('*');
             putchar(' ');
@@ -31,5 +28,4 @@ while (num != 0) {
             putchar('\n');
         }
     }
-    num += 1;
 }

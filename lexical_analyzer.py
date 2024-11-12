@@ -12,6 +12,7 @@ class Token(IntEnum):
     KW_WHILE = auto()  # while
     KW_IF = auto()  # if
     KW_ELSE = auto()  # else
+    KW_FOR = auto() # for
     AND = auto()  # &
     OR = auto()  # |
     NOT = auto()  # !
@@ -62,11 +63,12 @@ class LexicalAnalyzer:
         if match := re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)', self.string[self.pos :]):
             head = match.group(1)
             self.pos += len(head)
-            if head in ['while', 'if', 'else']:
+            if head in ['while', 'if', 'else', 'for']:
                 t = {
                     'while': Token.KW_WHILE,
                     'if': Token.KW_IF,
                     'else': Token.KW_ELSE,
+                    'for': Token.KW_FOR,
                 }[head]
                 return {
                     'type': t,

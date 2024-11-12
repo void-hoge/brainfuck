@@ -20,8 +20,11 @@ class Program:
 
     def codegen(self, sm, tables, debug=False):
         scope, code = self.body.analyze_scope_variables(sm, tables, debug)
-        code += self.body.codegen(sm, tables + [scope] , debug)
-        return code     
+        code += self.body.codegen(sm, tables + [scope], debug)
+        return code
+
+    def string(self, level=0):
+        return self.body.string(level)
 
 class Statement:
     pass
@@ -34,7 +37,10 @@ class StList(Statement):
     def string(self, level):
         s = ''
         for st in self.body:
-            s += st.string(level)
+            if isinstance(st, StFor) or isinstance(st, StWhile) or isinstance(st, StIf):
+                s += st.string(level)
+            else:
+                s += st.string(level) + ';\n'
         return s
 
     def codegen(self, sm, tables, debug=False):
@@ -62,6 +68,44 @@ class StList(Statement):
                 scope[name] = {'type': 'array', 'pos': sm.dp + size, 'size': size}
                 code += statement.allocate(sm, debug)
         return scope, code
+
+class StFor(Statement):
+    def __init__(self, init, condition, reinit, body):
+        self.init = init
+        self.condition = condition
+        self.reinit = reinit
+        self.body = body
+
+    def string(self, level):
+        s = indent(level) + f'for ({self.init.string(0) if self.init else ""}; {self.condition if self.condition else ""}; {self.reinit.string(0) if self.reinit else ""}) {{\n'
+        s += self.body.string(level + 1)
+        s += indent(level) + f'}}\n'
+        return s
+
+    def codegen(self, sm, tables, debug=False):
+        if self.init:
+            scope, code = StList([self.init]).analyze_scope_variables(sm, tables, debug)
+            code += self.init.codegen(sm, tables + [scope], debug)
+            scope_, code_ = self.body.analyze_scope_variables(sm, tables + [scope], debug)
+            for name, var in scope_.items():
+                scope[name] = var
+            size = sum(var['size'] for name, var in scope.items())
+            code += code_
+        else:
+            scope, code = self.body.analyze_scope_variables(sm, tables, debug)
+            size = sum(var['size'] for name, var in scope.items())
+        code += self.condition.codegen(sm, tables + [scope], debug)
+        code += sm.begin_while(debug)
+        code += self.body.codegen(sm, tables + [scope], debug)
+        if self.reinit:
+            var = next((table[self.reinit.left.name] for table in (tables + [scope])[::-1] if self.reinit.left.name in table), None)
+            if not var:
+                raise SemanticError(f'Undefined variable {self.reinit.left.name}.')
+            code += self.reinit.codegen(sm, tables + [scope], debug)
+        code += self.condition.codegen(sm, tables + [scope], debug)
+        code += sm.end_while(debug)
+        code += sm.pop(size, debug)
+        return code
 
 
 class StIf(Statement):
@@ -130,7 +174,7 @@ class StAssign(Statement):
         self.right = right
 
     def string(self, level):
-        return f'{indent(level)}{self.left} {self.mode} {self.right};\n'
+        return f'{indent(level)}{self.left} {self.mode} {self.right}'
 
     def codegen(self, sm, tables, debug=False):
         code = ''
@@ -190,7 +234,7 @@ class StArrayInit(Statement):
         self.size = size
 
     def string(self, level):
-        return f'{self.name}[{self.size}];\n'
+        return f'{self.name}[{self.size}]'
 
     def codegen(self, sm, tables, debug=False):
         array = tables[-1][self.name]
@@ -210,14 +254,15 @@ class StCall(Statement):
         self.expr = ExpCall(name, args)
 
     def string(self, level):
-        return f'{indent(level)}{self.expr};\n'
+        return f'{indent(level)}{self.expr}'
 
     def codegen(self, sm, tables, debug=False):
         begin = sm.dp
         code = self.expr.codegen(sm, tables, debug)
         end = sm.dp
         assert begin <= end
-        code += sm.pop(end - begin, debug)
+        if end - begin > 0:
+            code += sm.pop(end - begin, debug)
         return code
 
 
@@ -646,6 +691,9 @@ class Parser:
         elif self.peek()['type'] == Token.KW_IF:
             statement = self.parse_statement_if()
             return statement
+        elif self.peek()['type'] == Token.KW_FOR:
+            statement = self.parse_statement_for()
+            return statement
         else:
             self.expect(Token.ID)
             if self.peek()['type'] == Token.LPAREN:
@@ -658,6 +706,29 @@ class Parser:
                 assign = self.parse_assignment()
                 self.expect(Token.SEMICOLON)
                 return assign
+
+    def parse_statement_for(self):
+        self.expect(Token.KW_FOR)
+        self.expect(Token.LPAREN)
+        if self.peek()['type'] == Token.SEMICOLON:
+            init = None
+        else:
+            init = self.parse_assignment()
+        self.expect(Token.SEMICOLON)
+        if self.peek()['type'] == Token.SEMICOLON:
+            condition = ExpInteget(1)
+        else:
+            condition = self.parse_expression()
+        self.expect(Token.SEMICOLON)
+        if self.peek()['type'] == Token.RPAREN:
+            reinit = None
+        else:
+            reinit = self.parse_assignment()
+        self.expect(Token.RPAREN)
+        self.expect(Token.LBRACE)
+        body = self.parse_statement_list()
+        self.expect(Token.RBRACE)
+        return StFor(init, condition, reinit, body)
 
     def parse_statement_if(self):
         self.expect(Token.KW_IF)

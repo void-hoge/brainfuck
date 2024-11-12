@@ -1,0 +1,44 @@
+message[21];
+message[0] = ' ';
+message[1] = 'i';
+message[2] = 's';
+message[3] = ' ';
+message[4] = 'a';
+message[5] = ' ';
+message[6] = 'p';
+message[7] = 'r';
+message[8] = 'i';
+message[9] = 'm';
+message[10] = 'e';
+message[11] = ' ';
+message[12] = 'n';
+message[13] = 'u';
+message[14] = 'm';
+message[15] = 'b';
+message[16] = 'e';
+message[17] = 'r';
+message[18] = '!';
+message[19] = '\n';
+
+table[8];
+table[0] = 2;
+table[1] = 3;
+table[2] = 5;
+table[3] = 7;
+table[4] = 11;
+table[5] = 13;
+table[6] = 17;
+table[7] = 19;
+
+for (num = 2; num != 0; num += 1) {
+    flag = 1;
+    for (i = 0; flag & i < 6 & table[i] * table[i] <= num; i += 1) {
+        if (num % table[i] == 0) {
+            flag = 0;
+        }
+    }
+    if (flag) {
+        putint(num);
+        putarr(message);
+    }
+}
