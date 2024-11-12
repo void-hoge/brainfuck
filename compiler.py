@@ -9,7 +9,7 @@ class Compiler:
     def __init__(self, text):
         parser = Parser(LexicalAnalyzer(text))
         self.prog = parser.parse_program()
-        self.tables = [{}]
+        self.tables = []
         self.stackmachine = StackMachine()
 
     def codegen(self, debug=False):

@@ -941,6 +941,27 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual(20, dp)
         self.assertEqual(list(range(10)) + [0] * 11, data)
 
+    def test_048_sm_put_array(self):
+        debug = False
+        dump = False
+        string = 'voidhoge'
+        sm = StackMachine()
+        code = 'sm puta'
+        code += sm.load_constant(0, debug)
+        for i, ch in enumerate(string[::-1]):
+            code += sm.load_constant(ord(ch), debug)
+        pos = sm.dp
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.put_array(pos, debug)
+        out, dp, data = run(code, dump=dump)
+        self.assertEqual(out, string)
+        self.assertEqual(sm.dp, dp)
+        self.assertEqual(dp, len(string) + 5)
+        self.assertEqual([0] + list(map(ord, string[::-1])) + [0, 0, 0, 0, 0], data)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -14,6 +14,15 @@ class SemanticError(SyntaxError):
     pass
 
 
+class Program:
+    def __init__(self, body):
+        self.body = body
+
+    def codegen(self, sm, tables, debug=False):
+        scope, code = self.body.analyze_scope_variables(sm, tables, debug)
+        code += self.body.codegen(sm, tables + [scope] , debug)
+        return code     
+
 class Statement:
     pass
 
@@ -33,6 +42,26 @@ class StList(Statement):
         for st in self.body:
             code += st.codegen(sm, tables, debug)
         return code
+
+    def analyze_scope_variables(self, sm, tables, debug):
+        scope = {}
+        code = ''
+        for statement in self.body:
+            if isinstance(statement, StAssign):
+                name = statement.left.name
+                var = next((table[name] for table in (tables + [scope])[::-1] if name in table), None)
+                if not var:
+                    scope[name] = {'type': 'variable', 'pos': sm.dp, 'size': 1}
+                    code += sm.load_constant(0, debug)
+            elif isinstance(statement, StArrayInit):
+                name = statement.name
+                arr = next((table[name] for table in (tables + [scope])[::-1] if name in table), None)
+                if arr:
+                    raise SemanticError(f'Array "{name}" is already exists.')
+                size = statement.size.evaluate()
+                scope[name] = {'type': 'array', 'pos': sm.dp + size, 'size': size}
+                code += statement.allocate(sm, debug)
+        return scope, code
 
 
 class StIf(Statement):
@@ -55,9 +84,15 @@ class StIf(Statement):
     def codegen(self, sm, tables, debug=False):
         code = self.condition.codegen(sm, tables, debug)
         code += sm.begin_if(debug)
+        scope, code_ = self.body_then.analyze_scope_variables(sm, tables, debug)
+        tables += [scope]
+        code += code_
         code += self.body_then.codegen(sm, tables, debug)
         code += sm.begin_else(debug)
         if self.body_else:
+            scope, code_ = self.body_then.analyze_scope_variables(sm, tables, debug)
+            tables += [scope]
+            code += code_
             code += self.body_else.codegen(sm, tables, debug)
         code += sm.end_if(debug)
         return code
@@ -75,7 +110,7 @@ class StWhile(Statement):
         return s
 
     def codegen(self, sm, tables, debug=False):
-        scope, code = self.analyze_scope_variables(sm, tables, debug)
+        scope, code = self.body.analyze_scope_variables(sm, tables, debug)
         size = sum(var['size'] for name, var in scope.items())
         code += self.condition.codegen(sm, tables, debug)
         tables += [scope]
@@ -86,26 +121,6 @@ class StWhile(Statement):
         code += sm.pop(size, debug)
         tables.pop()
         return code
-
-    def analyze_scope_variables(self, sm, tables, debug):
-        scope = {}
-        code = ''
-        for statement in self.body.body:
-            if isinstance(statement, StAssign):
-                name = statement.left.name
-                var = next((table[name] for table in tables[::-1] if name in table), None)
-                if not var:
-                    scope[name] = {'type': 'variable', 'pos': sm.dp, 'size': 1}
-                    code += sm.load_constant(0, debug)
-            elif isinstance(statement, StArrayInit):
-                name = statement.name
-                arr = next((table[name] for table in tables[::-1] if name in table), None)
-                if arr:
-                    raise SemanticError(f'Array "{name}" is already exists.')
-                size = statement.size.evaluate()
-                scope[name] = {'type': 'array', 'pos': sm.dp + size, 'size': size}
-                code += statement.allocate(sm, debug)
-        return scope, code
 
 
 class StAssign(Statement):
@@ -329,6 +344,16 @@ class ExpCall(Expression):
             code += sm.store_address(second['pos'], debug)
         return code
 
+    def inline_putarr(self, sm, tables, debug=False):
+        if len(self.args) != 1:
+            raise SemanticError(f'Inline function "putarr" takes two arguments, but entered "{self.args}"')
+        var = next((table[self.args[0].name] for table in tables[::-1] if self.args[0].name in table), None)
+        if not var:
+            raise SemanticError(f'Undefined array {self.args[0].name}')
+        if var['type'] != 'array':
+            raise SemanticError(f'"{self.args[0].name}" is not an array.')
+        return sm.put_array(var['pos'], debug)
+
     def codegen(self, sm, tables, debug=False):
         if self.name == 'putchar':
             return self.inline_putchar(sm, tables, debug)
@@ -340,6 +365,8 @@ class ExpCall(Expression):
             return self.inline_getint(sm, tables, debug)
         elif self.name == 'swap':
             return self.inline_swap(sm, tables, debug)
+        elif self.name == 'putarr':
+            return self.inline_putarr(sm, tables, debug)
         else:
             raise SyntaxError(f'No matching inline funcions: {self.name}')
 
@@ -604,7 +631,7 @@ class Parser:
         self.lex = lex
 
     def parse_program(self):
-        return self.parse_statement_list()
+        return Program(self.parse_statement_list())
 
     def parse_statement_list(self):
         statements = []

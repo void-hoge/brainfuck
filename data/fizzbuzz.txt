@@ -1,3 +1,13 @@
+fizzarr[5];
+fizzarr[0] = 'F';
+fizzarr[1] = 'i';
+fizzarr[2] = 'z';
+fizzarr[3] = 'z';
+buzzarr[5];
+buzzarr[0] = 'B';
+buzzarr[1] = 'u';
+buzzarr[2] = 'z';
+buzzarr[3] = 'z';
 num = 1;
 while (num != 0) {
     fizz = num % 3 == 0;
@@ -7,16 +17,10 @@ while (num != 0) {
         putint(num);
     }
     if (fizz) {
-        putchar('F');
-        putchar('i');
-        putchar('z');
-        putchar('z');
+        putarr(fizzarr);
     }
     if (buzz) {
-        putchar('B');
-        putchar('u');
-        putchar('z');
-        putchar('z');
+        putarr(buzzarr);
     }
     putchar(' ');
     num += 1;

@@ -387,3 +387,12 @@ class StackMachine:
         code += '[-]>' * (end - begin)
         code += mvp(self.dp - end)
         return code + '\n' if debug else code
+
+    def put_array(self, pos, debug=False):
+        assert 0 <= pos
+        assert pos <= self.dp
+        code = 'puta: ' if debug else ''
+        code += mvp(pos - self.dp)
+        code += '<[.<]>[>]'
+        code += mvp(self.dp - pos)
+        return code + '\n' if debug else code
