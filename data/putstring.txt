@@ -1,0 +1,11 @@
+voidhoge[10];
+voidhoge[0] = 'v';
+voidhoge[1] = 'o';
+voidhoge[2] = 'i';
+voidhoge[3] = 'd';
+voidhoge[4] = 'h';
+voidhoge[5] = 'o';
+voidhoge[6] = 'g';
+voidhoge[7] = 'e';
+voidhoge[8] = '\n';
+putarr(voidhoge);
