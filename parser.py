@@ -65,6 +65,10 @@ class StList(Statement):
                 if arr:
                     raise SemanticError(f'Array "{name}" is already exists.')
                 size = statement.size.evaluate()
+                if size <= 0:
+                    raise SyntaxError('Array size must be larger than 0.')
+                if size > 256:
+                    raise SyntaxError('Array size must be less or equal 256.')
                 scope[name] = {'type': 'array', 'pos': sm.dp + size, 'size': size}
                 code += statement.allocate(sm, debug)
         return scope, code
@@ -245,6 +249,10 @@ class StArrayInit(Statement):
 
     def allocate(self, sm, debug=False):
         size = self.size.evaluate()
+        if size <= 0:
+            raise SyntaxError('Array size must be larger than 0.')
+        if size > 256:
+            raise SyntaxError('Array size must be less or equal 256.')
         code = sm.push_array(size, debug)
         return code
 
@@ -459,7 +467,7 @@ class ExpInteger(Expression):
         return str(self.value)
 
     def evaluate(self):
-        return self.value & 0xFF
+        return self.value
 
     def codegen(self, sm, tables, debug=False):
         return sm.load_constant(self.value, debug)
@@ -473,7 +481,7 @@ class ExpCharacter(Expression):
         return repr(chr(self.value))
 
     def evaluate(self):
-        return self.value & 0xFF
+        return self.value
 
     def codegen(self, sm, tables, debug=False):
         return sm.load_constant(self.value, debug)
@@ -592,9 +600,9 @@ class ExpAdditive(Expression):
         left = int(self.left.evaluate())
         right = int(self.right.evaluate())
         if self.mode == '+':
-            return int(left + right) & 0xFF
+            return int(left + right)
         else:  # self.mode == '-'
-            return int(left - right) & 0xFF
+            return int(left - right)
 
     def codegen(self, sm, tables, debug=False):
         code = self.left.codegen(sm, tables, debug)
@@ -619,11 +627,11 @@ class ExpMultiplicative(Expression):
         left = int(self.left.evaluate())
         right = int(self.right.evaluate())
         if self.mode == '*':
-            return int(left * right) & 0xFF
+            return int(left * right)
         elif self.mode == '/':
-            return int(left // right) & 0xFF
+            return int(left // right)
         else:  # self.mode == '%'
-            return int(left % right) & 0xFF
+            return int(left % right)
 
     def codegen(self, sm, tables, debug=False):
         code = self.left.codegen(sm, tables, debug)
@@ -650,11 +658,11 @@ class ExpUnary(Expression):
 
     def evaluate(self):
         if self.mode == '!':
-            return int(not bool(self.operand.evaluate())) & 0xFF
+            return int(not bool(self.operand.evaluate()))
         elif self.mode == '-':
-            return (255 - self.operand.evaluate()) & 0xFF
+            return (255 - self.operand.evaluate())
         else:  # +
-            return int(bool(self.operand.evaluate())) & 0xFF
+            return int(bool(self.operand.evaluate()))
 
     def codegen(self, sm, tables, debug=False):
         code = ''
