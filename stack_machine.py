@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import math
 
 def sanitize(num):
     if num < 0:
@@ -395,4 +396,21 @@ class StackMachine:
         code += mvp(pos - self.dp)
         code += '<[.<]>[>]'
         code += mvp(self.dp - pos)
+        return code + '\n' if debug else code
+
+    def multi_dim_load(self, pos, shape, debug=False):
+        assert 0 <= pos
+        assert pos <= self.dp
+        dim = len(shape)
+        rpos = pos - self.dp
+        code = f'mdl {pos} {dim}: ' if debug else ''
+        for _ in range(dim):
+            code += '<'
+            code += multi_dst_add([rpos])
+        for d in range(dim-1):
+            print(shape[d+1:])
+            stride = math.prod(shape[d+1:])
+            print(stride)
+            code += '<'
+            code += f'[-{mvp(stride + )}]'
         return code + '\n' if debug else code

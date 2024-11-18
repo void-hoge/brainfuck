@@ -962,6 +962,34 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual(dp, len(string) + 5)
         self.assertEqual([0] + list(map(ord, string[::-1])) + [0, 0, 0, 0, 0], data)
 
+    def test_049_sm_multi_dim_load(self):
+        debug = True
+        dump = False
+        sm = StackMachine()
+        code = 'sm multidimload'
+        shape = (4, 3, 2)
+        for i in range(shape[0])[::-1]:
+            for j in range(shape[1])[::-1]:
+                for k in range(shape[2])[::-1]:
+                    code += sm.load_constant(i * shape[1] * shape[2] + j * shape[2] + k + 10, debug)
+                for _ in range(3):
+                    code += sm.load_constant(0, debug=False)
+            for _ in range(3):
+                code += sm.load_constant(0, debug=False)
+        pos = sm.dp
+        code += sm.load_constant(1, debug)
+        code += sm.load_constant(2, debug)
+        code += sm.load_constant(3, debug)
+        code += sm.multi_dim_load(pos, shape, debug)
+        out, dp, data = run(code, dump=dump)
+        print(f'{pos=}')
+        for i in range(len(data)):
+            print(f'{i:2} ', end='')
+        print()
+        for i in data:
+            print(f'{i:2} ', end='')
+        print()
+
 
 if __name__ == '__main__':
     unittest.main()
