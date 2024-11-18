@@ -161,13 +161,11 @@ class StWhile(Statement):
         scope, code = self.body.analyze_scope_variables(sm, tables, debug)
         size = sum(var['size'] for name, var in scope.items())
         code += self.condition.codegen(sm, tables, debug)
-        tables += [scope]
         code += sm.begin_while(debug)
-        code += self.body.codegen(sm, tables, debug)
+        code += self.body.codegen(sm, tables + [scope], debug)
         code += self.condition.codegen(sm, tables, debug)
         code += sm.end_while(debug)
         code += sm.pop(size, debug)
-        tables.pop()
         return code
 
 
