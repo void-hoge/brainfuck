@@ -963,36 +963,99 @@ class TestStackMachine(unittest.TestCase):
         self.assertEqual([0] + list(map(ord, string[::-1])) + [0, 0, 0, 0, 0], data)
 
     def test_049_sm_multi_dim_load(self):
-        debug = True
+        debug = False
         dump = False
         sm = StackMachine()
         code = 'sm multidimload'
-        shape = (2,3,4)
+        shape = (5,4,3)
+        testdata = []
 
         def initialize(idx, shape, dim):
             nonlocal code
             nonlocal sm
+            nonlocal testdata
             if dim == len(shape) - 1:
                 for i in range(shape[dim]):
                     code += sm.load_constant(idx * shape[dim] + i + 10, debug)
+                    testdata += [idx * shape[dim] + i + 10]
                 for _ in range(4):
                     code += sm.load_constant(0, debug)
+                    testdata += [0]
             else:
                 for i in range(shape[dim]):
                     initialize(idx * shape[dim] + i, shape, dim + 1)
             if dim != 0:
                 code += sm.load_constant(0, debug)
+                testdata += [0]
 
         initialize(0, shape, 0)
         pos = sm.dp
+        code += sm.load_constant(ord('a'), debug)
+        code += sm.load_constant(ord('a'), debug)
+        code += sm.load_constant(ord('a'), debug)
+        testdata += [ord('a')] * 3
         for p in shape[::-1]:
             code += sm.load_constant(p - 1, debug)
 
         code += sm.multi_dim_load(pos, shape, debug)
+        testdata += [10]
+        testdata += [0] * len(shape)
         out, dp, data = run(code, dump=dump)
         print(f'pos: {pos}')
 
-        m = 28
+        m = 33
+        for begin in range(0, len(data), m):
+            for i in range(m):
+                print(f'{begin + i:3}', end='')
+            print()
+            for i in data[begin:begin+m]:
+                print(f'{i:3}', end='')
+            print()
+        self.assertEqual(data, testdata)
+        self.assertEqual(dp, sm.dp)
+
+    def test_050_sm_multi_dim_store(self):
+        debug = False
+        dump = False
+        sm = StackMachine()
+        code = 'sm multidimload'
+        shape = (5,4,3)
+        testdata = []
+
+        def initialize(idx, shape, dim):
+            nonlocal code
+            nonlocal sm
+            nonlocal testdata
+            if dim == len(shape) - 1:
+                for i in range(shape[dim]):
+                    code += sm.load_constant(idx * shape[dim] + i + 10, debug)
+                    testdata += [idx * shape[dim] + i + 10]
+                for _ in range(4):
+                    code += sm.load_constant(0, debug)
+                    testdata += [0]
+            else:
+                for i in range(shape[dim]):
+                    initialize(idx * shape[dim] + i, shape, dim + 1)
+            if dim != 0:
+                code += sm.load_constant(0, debug)
+                testdata += [0]
+        initialize(0, shape, 0)
+        pos = sm.dp
+        code += sm.load_constant(ord('a'), debug)
+        code += sm.load_constant(ord('a'), debug)
+        code += sm.load_constant(ord('a'), debug)
+        testdata += [ord('a')] * 3
+        for p in shape[::-1]:
+            code += sm.load_constant(p - 1, debug)
+        code += sm.load_constant(99, debug)
+
+        code += sm.multi_dim_store(pos, shape, debug)
+        testdata += [0] * (len(shape) + 2)
+        testdata[0] = 99
+        out, dp, data = run(code, dump=dump)
+        print(f'pos: {pos}')
+
+        m = 33
         for begin in range(0, len(data), m):
             for i in range(m):
                 print(f'{begin + i:3}', end='')
@@ -1001,6 +1064,8 @@ class TestStackMachine(unittest.TestCase):
                 print(f'{i:3}', end='')
             print()
             print()
+        self.assertEqual(data, testdata)
+        self.assertEqual(dp, sm.dp)
 
 
 if __name__ == '__main__':
