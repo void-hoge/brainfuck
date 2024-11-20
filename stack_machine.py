@@ -398,6 +398,26 @@ class StackMachine:
         code += mvp(self.dp - pos)
         return code + '\n' if debug else code
 
+    def push_multi_dim_array(self, shape, debug=False):
+        assert 0 <= self.dp
+        assert len(shape) > 0
+        assert 0 not in shape
+        code = f'push multi dim array ({" ".join(map(str, shape))}): ' if debug else ''
+        def initialize(shape, dim):
+            nonlocal code
+            if dim == len(shape) - 1:
+                for i in range(shape[dim]):
+                    code += self.load_constant(0, False)
+                for _ in range(4):
+                    code += self.load_constant(0, False)
+            else:
+                for i in range(shape[dim]):
+                    initialize(shape, dim + 1)
+            if dim != 0:
+                code += self.load_constant(0, False)
+        initialize(shape, 0)
+        return code + '\n 'if debug else code
+
     def multi_dim_load(self, pos, shape, debug=False):
         assert 0 < pos
         assert len(shape) < self.dp
@@ -444,7 +464,7 @@ class StackMachine:
             code += '>'
         code += mvp(-len(shape) - 1)
         code += multi_dst_add([- rpos + 1])
-        code += mvp(len(shape) - rpos - 1)
+        code += mvp(- rpos + 2)
         self.dp -= len(shape) - 1
         return code + '\n' if debug else code
 
@@ -455,11 +475,12 @@ class StackMachine:
         rpos = pos - self.dp
         code = f'mds {pos} ({" ".join(map(str, shape))}): ' if debug else ''
 
-        code += '<'
-        code += multi_dst_add([rpos - len(shape) - 1])
+
         for s in shape:
             code += '<'
-            code += multi_dst_add([rpos])
+            code += multi_dst_add([rpos - 1])
+        code += '<'
+        code += multi_dst_add([rpos - 1])
         code += mvp(rpos + len(shape) - 1)
 
         def dimlength(shape, dim):
@@ -491,6 +512,6 @@ class StackMachine:
             code += mvp(dimlen)
             code += ']'
             code += '>'
-        code += mvp(-rpos - len(shape) - 1)
+        code += mvp(- len(shape) - rpos - 1)
         self.dp -= len(shape) + 1        
         return code + '\n' if debug else code

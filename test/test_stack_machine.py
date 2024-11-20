@@ -967,7 +967,7 @@ class TestStackMachine(unittest.TestCase):
         dump = False
         sm = StackMachine()
         code = 'sm multidimload'
-        shape = (5,4,3)
+        shape = (5,5)
         testdata = []
 
         def initialize(idx, shape, dim):
@@ -977,7 +977,7 @@ class TestStackMachine(unittest.TestCase):
             if dim == len(shape) - 1:
                 for i in range(shape[dim]):
                     code += sm.load_constant(idx * shape[dim] + i + 10, debug)
-                    testdata += [idx * shape[dim] + i + 10]
+                    testdata += [(idx * shape[dim] + i + 10) & 0xFF]
                 for _ in range(4):
                     code += sm.load_constant(0, debug)
                     testdata += [0]
@@ -1003,7 +1003,7 @@ class TestStackMachine(unittest.TestCase):
         out, dp, data = run(code, dump=dump)
         print(f'pos: {pos}')
 
-        m = 33
+        m = 10
         for begin in range(0, len(data), m):
             for i in range(m):
                 print(f'{begin + i:3}', end='')
@@ -1019,7 +1019,7 @@ class TestStackMachine(unittest.TestCase):
         dump = False
         sm = StackMachine()
         code = 'sm multidimload'
-        shape = (5,4,3)
+        shape = (5,5)
         testdata = []
 
         def initialize(idx, shape, dim):
@@ -1044,10 +1044,10 @@ class TestStackMachine(unittest.TestCase):
         code += sm.load_constant(ord('a'), debug)
         code += sm.load_constant(ord('a'), debug)
         code += sm.load_constant(ord('a'), debug)
+        code += sm.load_constant(99, debug)
         testdata += [ord('a')] * 3
         for p in shape[::-1]:
             code += sm.load_constant(p - 1, debug)
-        code += sm.load_constant(99, debug)
 
         code += sm.multi_dim_store(pos, shape, debug)
         testdata += [0] * (len(shape) + 2)
@@ -1055,7 +1055,7 @@ class TestStackMachine(unittest.TestCase):
         out, dp, data = run(code, dump=dump)
         print(f'pos: {pos}')
 
-        m = 33
+        m = 10
         for begin in range(0, len(data), m):
             for i in range(m):
                 print(f'{begin + i:3}', end='')

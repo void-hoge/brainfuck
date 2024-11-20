@@ -64,12 +64,13 @@ class StList(Statement):
                 arr = next((table[name] for table in (tables + [scope])[::-1] if name in table), None)
                 if arr:
                     raise SemanticError(f'Array "{name}" is already exists.')
-                size = statement.size.evaluate()
-                if size <= 0:
+                shape = statement.getshape()
+                if 0 in shape:
                     raise SyntaxError('Array size must be larger than 0.')
-                if size > 256:
+                if any(size > 256 for size in shape):
                     raise SyntaxError('Array size must be less or equal 256.')
-                scope[name] = {'type': 'array', 'pos': sm.dp + size, 'size': size}
+                size = statement.totalsize()
+                scope[name] = {'type': 'array', 'pos': sm.dp + size, 'size': size, 'shape': shape}
                 code += statement.allocate(sm, debug)
         return scope, code
 
@@ -161,13 +162,11 @@ class StWhile(Statement):
         scope, code = self.body.analyze_scope_variables(sm, tables, debug)
         size = sum(var['size'] for name, var in scope.items())
         code += self.condition.codegen(sm, tables, debug)
-        tables += [scope]
         code += sm.begin_while(debug)
-        code += self.body.codegen(sm, tables, debug)
+        code += self.body.codegen(sm, tables + [scope], debug)
         code += self.condition.codegen(sm, tables, debug)
         code += sm.end_while(debug)
         code += sm.pop(size, debug)
-        tables.pop()
         return code
 
 
@@ -227,34 +226,46 @@ class StAssign(Statement):
             if var['type'] != 'array':
                 raise SemanticError(f'"{self.left.name}" is not an array.')
             code += self.right.codegen(sm, tables, debug)
-            code += self.left.index.codegen(sm, tables, debug)
-            code += sm.store_address(var['pos'], debug)
+            for idx in self.left.indices:
+                code += idx.codegen(sm, tables, debug)
+            code += sm.multi_dim_store(var['pos'], var['shape'], debug)
         return code
 
 
 class StArrayInit(Statement):
-    def __init__(self, name, size):
+    def __init__(self, name, shape):
         self.name = name
-        self.size = size
+        self.shape = shape
 
     def string(self, level):
-        return f'{self.name}[{self.size}]'
+        s = f'{self.name}'
+        for d in self.shape:
+            s += f'[{d}]'
+        return s
 
     def codegen(self, sm, tables, debug=False):
         array = tables[-1][self.name]
         begin = array['pos'] - array['size']
-        end = array['pos'] + 4
+        end = array['pos']
         code = sm.clean(begin, end, debug)
         return code
 
     def allocate(self, sm, debug=False):
-        size = self.size.evaluate()
-        if size <= 0:
-            raise SyntaxError('Array size must be larger than 0.')
-        if size > 256:
-            raise SyntaxError('Array size must be less or equal 256.')
-        code = sm.push_array(size, debug)
+        code = sm.push_multi_dim_array(self.getshape(), debug)
         return code
+
+    def getshape(self):
+        return [size.evaluate() for size in self.shape]
+
+    def totalsize(self):
+        shape = self.getshape()
+        def rec(shape, dim):
+            if len(shape) - 1 == dim:
+                return shape[dim] + 4
+            else:
+                return (rec(shape, dim + 1) + 1) * shape[dim]
+            return rec(shape, dim)
+        return rec(shape, 0)
 
 
 class StCall(Statement):
@@ -388,13 +399,15 @@ class ExpCall(Expression):
         if isinstance(self.args[0], ExpVariable):
             code += sm.store_variable(first['pos'], debug)
         else:
-            code += self.args[0].index.codegen(sm, tables, debug)
-            code += sm.store_address(first['pos'], debug)
+            for idx in self.args[0].indices:
+                code += idx.codegen(sm, tables, debug)
+            code += sm.multi_dim_store(first['pos'], first['shape'], debug)
         if isinstance(self.args[1], ExpVariable):
             code += sm.store_variable(second['pos'], debug)
         else:
-            code += self.args[1].index.codegen(sm, tables, debug)
-            code += sm.store_address(second['pos'], debug)
+            for idx in self.args[1].indices:
+                code += idx.codegen(sm, tables, debug)
+            code += sm.multi_dim_store(second['pos'], second['shape'], debug)
         return code
 
     def inline_putarr(self, sm, tables, debug=False):
@@ -425,12 +438,15 @@ class ExpCall(Expression):
 
 
 class ExpArrayElement(Expression):
-    def __init__(self, name, index):
+    def __init__(self, name, indices):
         self.name = name
-        self.index = index
+        self.indices = indices
 
     def __str__(self):
-        return f'{self.name}[{self.index}]'
+        s = f'{self.name}'
+        for idx in self.indices:
+            s += f'[{idx}]'
+        return s
 
     def codegen(self, sm, tables, debug=False):
         arrelm = next((table[self.name] for table in tables[::-1] if self.name in table), None)
@@ -438,8 +454,10 @@ class ExpArrayElement(Expression):
             raise SemanticError(f'Undefined variable/array: {self.name}')
         if arrelm['type'] == 'variable':
             raise SemanticError(f'"{self.name}" is not an array but a variable.')
-        code = self.index.codegen(sm, tables, debug)
-        code += sm.load_address(arrelm['pos'], debug)
+        code = ''
+        for idx in self.indices:
+            code += idx.codegen(sm, tables, debug)
+        code += sm.multi_dim_load(arrelm['pos'], arrelm['shape'], debug)
         return code
 
 
@@ -783,7 +801,7 @@ class Parser:
     def parse_assignment(self):
         left_expression = self.parse_left_expression()
         if isinstance(left_expression, ExpArrayElement) and self.peek()['type'] == Token.SEMICOLON:
-            return StArrayInit(left_expression.name, left_expression.index)
+            return StArrayInit(left_expression.name, left_expression.indices)
         right_expression = None
         token = self.peek()
         for token_type in [
@@ -809,10 +827,12 @@ class Parser:
         if token['type'] == Token.ID:
             self.seek()
             if self.peek()['type'] == Token.LBRACK:
-                self.seek()
-                index_expr = self.parse_expression()
-                self.expect(Token.RBRACK)
-                return ExpArrayElement(token['token'], index_expr)
+                indices = []
+                while self.peek()['type'] == Token.LBRACK:
+                    self.seek()
+                    indices += [self.parse_expression()]
+                    self.expect(Token.RBRACK)
+                return ExpArrayElement(token['token'], indices)
             elif self.peek()['type'] == Token.LPAREN:
                 self.unseek()
                 return None
@@ -893,10 +913,12 @@ class Parser:
                 self.unseek()
                 return self.parse_inline_function_call(asexp=True)
             elif self.peek()['type'] == Token.LBRACK:
-                self.seek()
-                index_expr = self.parse_expression()
-                self.expect(Token.RBRACK)
-                return ExpArrayElement(token['token'], index_expr)
+                indices = []
+                while self.peek()['type'] == Token.LBRACK:
+                    self.seek()
+                    indices += [self.parse_expression()]
+                    self.expect(Token.RBRACK)
+                return ExpArrayElement(token['token'], indices)
             else:
                 return ExpVariable(token['token'])
         elif self.peek()['type'] == Token.INT:

@@ -1,0 +1,36 @@
+mda[5][5];
+
+for (i = 0; i < 5; i += 1) {
+    for (j = 0; j < 5; j += 1) {
+        mda[i][j] = i * 5 + j + 'a';
+    }
+}
+
+for (i = 0; i < 5; i += 1) {
+    for (j = 0; j < 5; j += 1) {
+        putchar(mda[i][j]);
+    }
+    putchar('\n');
+}
+putchar('t');
+putchar('r');
+putchar('a');
+putchar('n');
+putchar('s');
+putchar('p');
+putchar('o');
+putchar('s');
+putchar('e');
+putchar('\n');
+for (i = 0; i < 5; i += 1) {
+    for (j = i + 1; j < 5; j += 1) {
+        swap(mda[i][j], mda[j][i]);
+    }
+}
+
+for (i = 0; i < 5; i += 1) {
+    for (j = 0; j < 5; j += 1) {
+        putchar(mda[i][j]);
+    }
+    putchar('\n');
+}
