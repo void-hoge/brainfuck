@@ -226,7 +226,7 @@ class StAssign(Statement):
             if var['type'] != 'array':
                 raise SemanticError(f'"{self.left.name}" is not an array.')
             code += self.right.codegen(sm, tables, debug)
-            for idx in self.left.indices:
+            for idx in self.left.indices[::-1]:
                 code += idx.codegen(sm, tables, debug)
             code += sm.multi_dim_store(var['pos'], var['shape'], debug)
         return code
@@ -399,13 +399,13 @@ class ExpCall(Expression):
         if isinstance(self.args[0], ExpVariable):
             code += sm.store_variable(first['pos'], debug)
         else:
-            for idx in self.args[0].indices:
+            for idx in self.args[0].indices[::-1]:
                 code += idx.codegen(sm, tables, debug)
             code += sm.multi_dim_store(first['pos'], first['shape'], debug)
         if isinstance(self.args[1], ExpVariable):
             code += sm.store_variable(second['pos'], debug)
         else:
-            for idx in self.args[1].indices:
+            for idx in self.args[1].indices[::-1]:
                 code += idx.codegen(sm, tables, debug)
             code += sm.multi_dim_store(second['pos'], second['shape'], debug)
         return code
@@ -455,7 +455,7 @@ class ExpArrayElement(Expression):
         if arrelm['type'] == 'variable':
             raise SemanticError(f'"{self.name}" is not an array but a variable.')
         code = ''
-        for idx in self.indices:
+        for idx in self.indices[::-1]:
             code += idx.codegen(sm, tables, debug)
         code += sm.multi_dim_load(arrelm['pos'], arrelm['shape'], debug)
         return code

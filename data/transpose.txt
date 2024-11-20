@@ -12,6 +12,7 @@ for (i = 0; i < 5; i += 1) {
     }
     putchar('\n');
 }
+putchar('\n');
 putchar('t');
 putchar('r');
 putchar('a');
@@ -21,6 +22,8 @@ putchar('p');
 putchar('o');
 putchar('s');
 putchar('e');
+putchar('d');
+putchar('\n');
 putchar('\n');
 for (i = 0; i < 5; i += 1) {
     for (j = i + 1; j < 5; j += 1) {
