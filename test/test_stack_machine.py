@@ -753,7 +753,7 @@ class TestStackMachine(unittest.TestCase):
         code += sm.add(debug)
         code += sm.put_character()
         code += sm.begin_else(debug)
-        code += sm.end_if(debug)
+v        code += sm.end_if(debug)
 
         code += sm.load_constant(ord(' '), debug)
         code += sm.put_character()
@@ -1029,7 +1029,7 @@ class TestStackMachine(unittest.TestCase):
             if dim == len(shape) - 1:
                 for i in range(shape[dim]):
                     code += sm.load_constant(idx * shape[dim] + i + 10, debug)
-                    testdata += [idx * shape[dim] + i + 10]
+                    testdata += [(idx * shape[dim] + i + 10) & 0xFF]
                 for _ in range(4):
                     code += sm.load_constant(0, debug)
                     testdata += [0]
