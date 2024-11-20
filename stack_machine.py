@@ -413,13 +413,13 @@ class StackMachine:
         def dimlength(shape, dim):
             def rec(shape, dim):
                 if len(shape) - 1 == dim:
-                    return shape[dim] + 5
+                    return shape[dim] + 4
                 else:
-                    return rec(shape, dim + 1) * shape[dim] + 1
+                    return (rec(shape, dim + 1) + 1) * shape[dim]
             return rec(shape, dim + 1)
 
         for dim, size in enumerate(shape[:-1]):
-            dimlen = dimlength(shape, dim)
+            dimlen = dimlength(shape, dim) + 1
             code += '[>'
             for _ in range(len(shape) - dim + 1):
                 code += multi_dst_add([-dimlen])
@@ -433,7 +433,7 @@ class StackMachine:
         code += '[->>>[-<<<<+>>>>]<<[->+<]<[->+<]>]>>>'
 
         for dim, size in enumerate(shape[:-1]):
-            dimlen = dimlength(shape, len(shape) - dim - 2)
+            dimlen = dimlength(shape, len(shape) - dim - 2) + 1
             code += '[-'
             code += multi_dst_add([dimlen])
             code += mvp(-dim - 2)
