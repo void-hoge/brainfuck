@@ -134,15 +134,13 @@ class StIf(Statement):
         code = self.condition.codegen(sm, tables, debug)
         code += sm.begin_if(debug)
         scope, code_ = self.body_then.analyze_scope_variables(sm, tables, debug)
-        tables += [scope]
         code += code_
-        code += self.body_then.codegen(sm, tables, debug)
+        code += self.body_then.codegen(sm, tables + [scope], debug)
         code += sm.begin_else(debug)
         if self.body_else:
             scope, code_ = self.body_then.analyze_scope_variables(sm, tables, debug)
-            tables += [scope]
             code += code_
-            code += self.body_else.codegen(sm, tables, debug)
+            code += self.body_else.codegen(sm, tables + [scope], debug)
         code += sm.end_if(debug)
         return code
 
@@ -401,7 +399,7 @@ class ExpCall(Expression):
         if isinstance(self.args[0], ExpVariable):
             code += sm.store_variable(first['pos'], debug)
         else:
-            if len(shape) != len(self.args[0].indices):
+            if len(first['shape']) != len(self.args[0].indices):
                 raise SemanticError('Number of array indices does not match.')
             for idx in self.args[0].indices[::-1]:
                 code += idx.codegen(sm, tables, debug)
@@ -409,7 +407,7 @@ class ExpCall(Expression):
         if isinstance(self.args[1], ExpVariable):
             code += sm.store_variable(second['pos'], debug)
         else:
-            if len(shape) != len(self.args[0].indices):
+            if len(second['shape']) != len(self.args[0].indices):
                 raise SemanticError('Number of array indices does not match.')
             for idx in self.args[1].indices[::-1]:
                 code += idx.codegen(sm, tables, debug)
