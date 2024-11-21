@@ -967,7 +967,7 @@ class TestStackMachine(unittest.TestCase):
         dump = False
         sm = StackMachine()
         code = 'sm multidimload'
-        shape = (5,5)
+        shape = (5, 5)
         testdata = []
 
         def initialize(idx, shape, dim):
@@ -1008,7 +1008,7 @@ class TestStackMachine(unittest.TestCase):
             for i in range(m):
                 print(f'{begin + i:3}', end='')
             print()
-            for i in data[begin:begin+m]:
+            for i in data[begin : begin + m]:
                 print(f'{i:3}', end='')
             print()
         self.assertEqual(data, testdata)
@@ -1019,7 +1019,7 @@ class TestStackMachine(unittest.TestCase):
         dump = False
         sm = StackMachine()
         code = 'sm multidimload'
-        shape = (5,5)
+        shape = (5, 5)
         testdata = []
 
         def initialize(idx, shape, dim):
@@ -1039,6 +1039,7 @@ class TestStackMachine(unittest.TestCase):
             if dim != 0:
                 code += sm.load_constant(0, debug)
                 testdata += [0]
+
         initialize(0, shape, 0)
         pos = sm.dp
         code += sm.load_constant(ord('a'), debug)
@@ -1060,7 +1061,7 @@ class TestStackMachine(unittest.TestCase):
             for i in range(m):
                 print(f'{begin + i:3}', end='')
             print()
-            for i in data[begin:begin+m]:
+            for i in data[begin : begin + m]:
                 print(f'{i:3}', end='')
             print()
             print()
@@ -1072,7 +1073,7 @@ class TestStackMachine(unittest.TestCase):
         dump = False
         sm = StackMachine()
         code = 'sm multidimput'
-        shape = (2,3,4)
+        shape = (2, 3, 4)
         testdata = []
 
         def initialize(idx, shape, dim):
@@ -1092,6 +1093,7 @@ class TestStackMachine(unittest.TestCase):
             if dim != 0:
                 code += sm.load_constant(0, debug)
                 testdata += [0]
+
         initialize(0, shape, 0)
         pos = sm.dp
         code += sm.load_constant(ord('a'), debug)
@@ -1119,7 +1121,7 @@ class TestStackMachine(unittest.TestCase):
             for i in range(m):
                 print(f'{begin + i:3}', end='')
             print()
-            for i in data[begin:begin+m]:
+            for i in data[begin : begin + m]:
                 print(f'{i:3}', end='')
             print()
             print()

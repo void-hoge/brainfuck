@@ -26,6 +26,7 @@ class Program:
     def string(self, level=0):
         return self.body.string(level)
 
+
 class Statement:
     pass
 
@@ -74,6 +75,7 @@ class StList(Statement):
                 code += statement.allocate(sm, debug)
         return scope, code
 
+
 class StFor(Statement):
     def __init__(self, init, condition, reinit, body):
         self.init = init
@@ -82,7 +84,10 @@ class StFor(Statement):
         self.body = body
 
     def string(self, level):
-        s = indent(level) + f'for ({self.init.string(0) if self.init else ""}; {self.condition if self.condition else ""}; {self.reinit.string(0) if self.reinit else ""}) {{\n'
+        s = (
+            indent(level)
+            + f'for ({self.init.string(0) if self.init else ""}; {self.condition if self.condition else ""}; {self.reinit.string(0) if self.reinit else ""}) {{\n'
+        )
         s += self.body.string(level + 1)
         s += indent(level) + f'}}\n'
         return s
@@ -103,7 +108,10 @@ class StFor(Statement):
         code += sm.begin_while(debug)
         code += self.body.codegen(sm, tables + [scope], debug)
         if self.reinit:
-            var = next((table[self.reinit.left.name] for table in (tables + [scope])[::-1] if self.reinit.left.name in table), None)
+            var = next(
+                (table[self.reinit.left.name] for table in (tables + [scope])[::-1] if self.reinit.left.name in table),
+                None,
+            )
             if not var:
                 raise SemanticError(f'Undefined variable {self.reinit.left.name}.')
             code += self.reinit.codegen(sm, tables + [scope], debug)
@@ -259,12 +267,14 @@ class StArrayInit(Statement):
 
     def totalsize(self):
         shape = self.getshape()
+
         def rec(shape, dim):
             if len(shape) - 1 == dim:
                 return shape[dim] + 4
             else:
                 return (rec(shape, dim + 1) + 1) * shape[dim]
             return rec(shape, dim)
+
         return rec(shape, 0)
 
 
@@ -691,7 +701,7 @@ class ExpUnary(Expression):
         if self.mode == '!':
             return int(not bool(self.operand.evaluate()))
         elif self.mode == '-':
-            return (255 - self.operand.evaluate())
+            return 255 - self.operand.evaluate()
         else:  # +
             return int(bool(self.operand.evaluate()))
 

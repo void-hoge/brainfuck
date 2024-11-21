@@ -18,6 +18,7 @@ class Compiler:
 
 if __name__ == '__main__':
     import sys
+
     with open(sys.argv[1]) as f:
         prog = f.read()
     debug = False
@@ -27,4 +28,4 @@ if __name__ == '__main__':
         print(code)
     else:
         for i in range(0, len(code), 80):
-            print(code[i:i+80])
+            print(code[i : i + 80])

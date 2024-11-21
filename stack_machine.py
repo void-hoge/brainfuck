@@ -2,6 +2,7 @@
 
 import math
 
+
 def sanitize(num):
     if num < 0:
         return f'neg{-num}'
@@ -57,12 +58,14 @@ def multi_dst_subtract(dsts):
     code += f'{mvp(-ret)}]'
     return code
 
+
 def dimlength(shape, dim):
     def rec(shape, dim):
         if len(shape) - 1 == dim:
             return shape[dim] + 4
         else:
             return (rec(shape, dim + 1) + 1) * shape[dim]
+
     return rec(shape, dim + 1)
 
 
@@ -411,6 +414,7 @@ class StackMachine:
         assert len(shape) > 0
         assert 0 not in shape
         code = f'push multi dim array ({" ".join(map(str, shape))}): ' if debug else ''
+
         def initialize(shape, dim):
             nonlocal code
             if dim == len(shape) - 1:
@@ -423,8 +427,9 @@ class StackMachine:
                     initialize(shape, dim + 1)
             if dim != 0:
                 code += self.load_constant(0, False)
+
         initialize(shape, 0)
-        return code + '\n 'if debug else code
+        return code + '\n ' if debug else code
 
     def multi_dim_load(self, pos, shape, debug=False):
         assert 0 < pos
@@ -458,8 +463,8 @@ class StackMachine:
             code += ']'
             code += '>'
         code += mvp(-len(shape) - 1)
-        code += multi_dst_add([- rpos + 1])
-        code += mvp(- rpos + 2)
+        code += multi_dst_add([-rpos + 1])
+        code += mvp(-rpos + 2)
         self.dp -= len(shape) - 1
         return code + '\n' if debug else code
 
@@ -493,7 +498,7 @@ class StackMachine:
             code += multi_dst_add([dimlen])
             code += mvp(dimlen)
             code += ']>'
-        code += mvp(- len(shape) - rpos - 1)
+        code += mvp(-len(shape) - rpos - 1)
         self.dp -= len(shape) + 1
         return code + '\n' if debug else code
 
@@ -525,5 +530,5 @@ class StackMachine:
             code += mvp(dimlen)
             code += ']>'
         code += mvp(-rpos - len(shape) + 1)
-        self.dp -= len(shape) - 1        
+        self.dp -= len(shape) - 1
         return code + '\n' if debug else code

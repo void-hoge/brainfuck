@@ -12,7 +12,7 @@ class Token(IntEnum):
     KW_WHILE = auto()  # while
     KW_IF = auto()  # if
     KW_ELSE = auto()  # else
-    KW_FOR = auto() # for
+    KW_FOR = auto()  # for
     AND = auto()  # &
     OR = auto()  # |
     NOT = auto()  # !
