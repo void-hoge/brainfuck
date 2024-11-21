@@ -226,6 +226,8 @@ class StAssign(Statement):
             if var['type'] != 'array':
                 raise SemanticError(f'"{self.left.name}" is not an array.')
             code += self.right.codegen(sm, tables, debug)
+            if len(var['shape']) != len(self.left.indices):
+                raise SemanticError('Number of array indices does not match.')
             for idx in self.left.indices[::-1]:
                 code += idx.codegen(sm, tables, debug)
             code += sm.multi_dim_store(var['pos'], var['shape'], debug)
@@ -399,12 +401,16 @@ class ExpCall(Expression):
         if isinstance(self.args[0], ExpVariable):
             code += sm.store_variable(first['pos'], debug)
         else:
+            if len(shape) != len(self.args[0].indices):
+                raise SemanticError('Number of array indices does not match.')
             for idx in self.args[0].indices[::-1]:
                 code += idx.codegen(sm, tables, debug)
             code += sm.multi_dim_store(first['pos'], first['shape'], debug)
         if isinstance(self.args[1], ExpVariable):
             code += sm.store_variable(second['pos'], debug)
         else:
+            if len(shape) != len(self.args[0].indices):
+                raise SemanticError('Number of array indices does not match.')
             for idx in self.args[1].indices[::-1]:
                 code += idx.codegen(sm, tables, debug)
             code += sm.multi_dim_store(second['pos'], second['shape'], debug)
@@ -412,13 +418,22 @@ class ExpCall(Expression):
 
     def inline_putarr(self, sm, tables, debug=False):
         if len(self.args) != 1:
-            raise SemanticError(f'Inline function "putarr" takes two arguments, but entered "{self.args}"')
+            raise SemanticError(f'Inline function "putarr" takes only one argument, but entered "{self.args}"')
         var = next((table[self.args[0].name] for table in tables[::-1] if self.args[0].name in table), None)
         if not var:
             raise SemanticError(f'Undefined array {self.args[0].name}')
         if var['type'] != 'array':
             raise SemanticError(f'"{self.args[0].name}" is not an array.')
-        return sm.put_array(var['pos'], debug)
+        code = ''
+        if isinstance(self.args[0], ExpVariable):
+            code += sm.load_constant(0, debug)
+        else:
+            if len(var['shape']) != len(self.args[0].indices) + 1:
+                raise SemanticError(f'Number of array indices does not match.')
+            for idx in self.args[0].indices[::-1]:
+                code += idx.codegen(sm, tables, debug)
+        code += sm.multi_dim_put(var['pos'], var['shape'], debug)
+        return code
 
     def codegen(self, sm, tables, debug=False):
         if self.name == 'putchar':

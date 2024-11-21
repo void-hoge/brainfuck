@@ -753,7 +753,7 @@ class TestStackMachine(unittest.TestCase):
         code += sm.add(debug)
         code += sm.put_character()
         code += sm.begin_else(debug)
-v        code += sm.end_if(debug)
+        code += sm.end_if(debug)
 
         code += sm.load_constant(ord(' '), debug)
         code += sm.put_character()
@@ -1066,6 +1066,63 @@ v        code += sm.end_if(debug)
             print()
         self.assertEqual(data, testdata)
         self.assertEqual(dp, sm.dp)
+
+    def test_051_sm_multi_dim_put(self):
+        debug = False
+        dump = False
+        sm = StackMachine()
+        code = 'sm multidimput'
+        shape = (2,3,4)
+        testdata = []
+
+        def initialize(idx, shape, dim):
+            nonlocal code
+            nonlocal sm
+            nonlocal testdata
+            if dim == len(shape) - 1:
+                for i in range(shape[dim]):
+                    code += sm.load_constant(idx * shape[dim] + i + ord('a') - 1, debug)
+                    testdata += [(idx * shape[dim] + i + ord(' ')) & 0xFF]
+                for _ in range(4):
+                    code += sm.load_constant(0, debug)
+                    testdata += [0]
+            else:
+                for i in range(shape[dim]):
+                    initialize(idx * shape[dim] + i, shape, dim + 1)
+            if dim != 0:
+                code += sm.load_constant(0, debug)
+                testdata += [0]
+        initialize(0, shape, 0)
+        pos = sm.dp
+        code += sm.load_constant(ord('a'), debug)
+        code += sm.load_constant(ord('a'), debug)
+        code += sm.load_constant(ord('a'), debug)
+        code += sm.load_constant(0, debug)
+        testdata += [ord('a')] * 3
+        for p in shape[::-1]:
+            code += sm.load_constant(p - 1, debug)
+
+        code += sm.multi_dim_store(pos, shape, debug)
+
+        for p in shape[:-1][::-1]:
+            code += sm.load_constant(p - 1, debug)
+
+        code += sm.multi_dim_put(pos, shape, debug)
+
+        testdata += [0] * (len(shape) + 2)
+        testdata[0] = 99
+        out, dp, data = run(code, dump=dump)
+        print(f'pos: {pos}')
+
+        m = 28
+        for begin in range(0, len(data), m):
+            for i in range(m):
+                print(f'{begin + i:3}', end='')
+            print()
+            for i in data[begin:begin+m]:
+                print(f'{i:3}', end='')
+            print()
+            print()
 
 
 if __name__ == '__main__':

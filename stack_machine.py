@@ -57,6 +57,14 @@ def multi_dst_subtract(dsts):
     code += f'{mvp(-ret)}]'
     return code
 
+def dimlength(shape, dim):
+    def rec(shape, dim):
+        if len(shape) - 1 == dim:
+            return shape[dim] + 4
+        else:
+            return (rec(shape, dim + 1) + 1) * shape[dim]
+    return rec(shape, dim + 1)
+
 
 class StackMachine:
     def __init__(self):
@@ -424,21 +432,10 @@ class StackMachine:
         assert pos <= self.dp
         rpos = pos - self.dp
         code = f'mdl {pos} ({"".join(map(str, shape))}): ' if debug else ''
-
         for s in shape:
             code += '<'
             code += multi_dst_add([rpos - 1])
-
         code += mvp(rpos + len(shape) - 2)
-
-        def dimlength(shape, dim):
-            def rec(shape, dim):
-                if len(shape) - 1 == dim:
-                    return shape[dim] + 4
-                else:
-                    return (rec(shape, dim + 1) + 1) * shape[dim]
-            return rec(shape, dim + 1)
-
         for dim, size in enumerate(shape[:-1]):
             dimlen = dimlength(shape, dim) + 1
             code += '[>'
@@ -448,11 +445,9 @@ class StackMachine:
             code += mvp(-dimlen + len(shape) - dim + 1) + '+'
             code += '<-]'
             code += '<'
-
         code += '[-<<<[->>>>+<<<<]>>[-<+>]<+>>[-<+>]<]<<<'
         code += '[->+>>+<<<]>[-<+>]>'
         code += '[->>>[-<<<<+>>>>]<<[->+<]<[->+<]>]>>>'
-
         for dim, size in enumerate(shape[:-1]):
             dimlen = dimlength(shape, len(shape) - dim - 2) + 1
             code += '[-'
@@ -474,23 +469,12 @@ class StackMachine:
         assert pos <= self.dp
         rpos = pos - self.dp
         code = f'mds {pos} ({" ".join(map(str, shape))}): ' if debug else ''
-
-
         for s in shape:
             code += '<'
             code += multi_dst_add([rpos - 1])
         code += '<'
         code += multi_dst_add([rpos - 1])
         code += mvp(rpos + len(shape) - 1)
-
-        def dimlength(shape, dim):
-            def rec(shape, dim):
-                if len(shape) - 1 == dim:
-                    return shape[dim] + 4
-                else:
-                    return (rec(shape, dim + 1) + 1) * shape[dim]
-            return rec(shape, dim + 1)
-
         for dim, size in enumerate(shape[:-1]):
             dimlen = dimlength(shape, dim) + 1
             code += '[>'
@@ -500,18 +484,46 @@ class StackMachine:
             code += mvp(-dimlen + len(shape) - dim + 2) + '+'
             code += '<-]'
             code += '<'
-
         code += '[<<<[->>>>+<<<<]>[-<+>]<+>>[-<+>]>-[-<+>]<]'
         code += '<<<[-]>>[-<<+>>]<[->+<]>'
         code += '[->>>[-<<<<+>>>>]<<<[->+<]>]>>>'
-
         for dim, size in enumerate(shape[:-1]):
             dimlen = dimlength(shape, len(shape) - dim - 2) + 1
             code += '[-'
             code += multi_dst_add([dimlen])
             code += mvp(dimlen)
-            code += ']'
-            code += '>'
+            code += ']>'
         code += mvp(- len(shape) - rpos - 1)
-        self.dp -= len(shape) + 1        
+        self.dp -= len(shape) + 1
+        return code + '\n' if debug else code
+
+    def multi_dim_put(self, pos, shape, debug=False):
+        assert 0 < pos
+        assert len(shape) - 1 < self.dp
+        assert pos <= self.dp
+        rpos = pos - self.dp
+        code = f'mdp {pos} ({" ".join(map(str, shape))}): ' if debug else ''
+        for s in shape[:-1]:
+            code += '<'
+            code += multi_dst_add([rpos - 1])
+        code += mvp(rpos + len(shape) - 3)
+        for dim, size in enumerate(shape[:-1]):
+            dimlen = dimlength(shape, dim) + 1
+            code += '[>'
+            for _ in range(len(shape) - dim + 2):
+                code += multi_dst_add([-dimlen])
+                code += '<'
+            code += mvp(-dimlen + len(shape) - dim + 2) + '+'
+            code += '<-]'
+            code += '<'
+        code += '<<<'
+        code += '[.<]>[>]>>>>'
+        for dim, size in enumerate(shape[:-1]):
+            dimlen = dimlength(shape, len(shape) - dim - 2) + 1
+            code += '[-'
+            code += multi_dst_add([dimlen])
+            code += mvp(dimlen)
+            code += ']>'
+        code += mvp(-rpos - len(shape) + 1)
+        self.dp -= len(shape) - 1        
         return code + '\n' if debug else code
