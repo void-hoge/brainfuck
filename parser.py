@@ -701,7 +701,7 @@ class ExpUnary(Expression):
         if self.mode == '!':
             return int(not bool(self.operand.evaluate()))
         elif self.mode == '-':
-            return 255 - self.operand.evaluate()
+            return 256 - self.operand.evaluate()
         else:  # +
             return int(bool(self.operand.evaluate()))
 
