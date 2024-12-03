@@ -1,0 +1,15 @@
+{
+    var a;
+} {
+    a = {
+        var c = 0;
+        var ans = c;
+    } {
+        while {} 0 <= c & c < 10 {
+            ans = ans * 10 + c;
+            c = get() - 48;
+        }
+        return ans;
+    };
+    return a;
+}

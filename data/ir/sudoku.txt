@@ -1,0 +1,188 @@
+{
+    arr grid[9][9];
+    var result;
+} {
+    while {var row = 0;} row < 9 {
+        while {var col = 0;} col < 9 {
+            grid[row][col] = {
+                var c = 0;
+                var ans = c;
+            } {
+                while {} 0 <= c & c < 10 {
+                    ans = ans * 10 + c;
+                    c = get() - 48;
+                }
+                return ans;
+            };
+            col = col + 1;
+        }
+        row = row + 1;
+    }
+    
+    while {var i = 0;} i < 9 {
+        if {} (i % 3 == 0) {
+            put(43);
+            while {var j = 0;} j < 3 {
+                put(45);
+                while {var k = 0;} k < 3 {
+                    put(45); put(45);
+                    k = k + 1;
+                }
+                put(43);
+                j = j + 1;
+            }
+            put(10);
+        }
+        while {var j = 0;} j < 9 {
+            if {} j % 3 == 0 {
+                put(124);
+                put(32);
+            }
+            if {} grid[i][j] == 0 {
+                put(32);
+            } else {
+                put(grid[i][j] + 48);
+            }
+            put(32);
+            j = j + 1;
+        }
+        put(124);
+        put(10);
+        i = i + 1;
+    }
+    put(43);
+    while {var i = 0;} i < 3 {
+        put(45);
+        while {var j = 0;} j < 3 {
+            put(45); put(45);
+            j = j + 1;
+        }
+        put(43);
+        i = i + 1;
+    }
+    put(10);
+
+    result = {
+        arr emptycells[2][9 * 9];
+        var k = 0;
+        var numempty = 0;
+    } {
+        while {var row = 0;} row < 9 {
+            while {var col = 0;} col < 9 {
+                emptycells[0][numempty] = row;
+                emptycells[1][numempty] = col;
+                numempty = numempty + 1;
+                col = col + 1;
+            }
+            row = row + 1;
+        }
+
+        while {
+            arr triednumbers[9][9];
+            var found;
+            var row;
+            var col;
+            var num;
+        } k != 255 & k < numempty {
+            row = emptycells[0][k];
+            col = emptycells[1][k];
+            found = 0;
+            num = triednumbers[row][col] + 1;
+            while {
+                var safe;
+            } num <= 9 & !found {
+                safe = 1;
+                while {var x = 0;} x < 9 & safe {
+                    if {} grid[row][x] == num {
+                        safe = 0;
+                    }
+                    x = x + 1;
+                }
+                while {var x = 0;} x < 9 & safe {
+                    if {} grid[x][col] == num {
+                        safe = 0;
+                    }
+                    x = x + 1;
+                }
+                if {
+                    var startrow = row - row % 3;
+                    var startcol = col - col % 3;
+                } safe {
+                    while {
+                        var i = 0;
+                    } i < 3 & safe {
+                        while {
+                            var j = 0;
+                        } j < 3 & safe {
+                            if {} grid[startrow + i][startcol + j] == num {
+                                safe = 0;
+                            }
+                            j = j + 1;
+                        }
+                        i = i + 1;
+                    }
+                }
+                if {} safe {
+                    grid[row][col] = num;
+                    triednumbers[row][col] = num;
+                    found = 1;
+                    k = k + 1;
+                }else {
+                    num = num + 1;
+                }
+            }
+            if {} !found {
+                grid[row][col] = 0;
+                triednumbers[row][col] = 0;
+                k = k - 1;
+            }
+        }
+        return k == numempty;
+    };
+
+    if {} result {
+        while {var i = 0;} i < 9 {
+            if {} (i % 3 == 0) {
+                put(43);
+                while {var j = 0;} j < 3 {
+                    put(45);
+                    while {var k = 0;} k < 3 {
+                        put(45); put(45);
+                        k = k + 1;
+                    }
+                    put(43);
+                    j = j + 1;
+                }
+                put(10);
+            }
+            while {var j = 0;} j < 9 {
+                if {} j % 3 == 0 {
+                    put(124);
+                    put(32);
+                }
+                if {} grid[i][j] == 0 {
+                    put(32);
+                } else {
+                    put(grid[i][j] + 48);
+                }
+                put(32);
+                j = j + 1;
+            }
+            put(124);
+            put(10);
+            i = i + 1;
+        }
+        put(43);
+        while {var i = 0;} i < 3 {
+            put(45);
+            while {var j = 0;} j < 3 {
+                put(45); put(45);
+                j = j + 1;
+            }
+            put(43);
+            i = i + 1;
+        }
+        put(10);
+    }
+}
+

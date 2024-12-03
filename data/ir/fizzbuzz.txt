@@ -1,0 +1,34 @@
+while {
+    var num = 1;
+    var fizz;
+    var buzz;
+    var nofizzbuzz;
+} (num != 0) {
+    fizz = num % 3 == 0;
+    buzz = num % 5 == 0;
+    nofizzbuzz = !(fizz | buzz);
+    if {} nofizzbuzz {
+        if {} num >= 100 {
+            put(num / 100 + 48);
+        }
+        if {} num >= 10 {
+            put((num % 100) / 10 + 48);
+        }
+        put(num % 10 + 48);
+    }
+    if {} fizz {
+        put(102);
+        put(105);
+        put(122);
+        put(122);
+    }
+    if {} buzz {
+        put(98);
+        put(117);
+        put(122);
+        put(122);
+    }
+    put(32);
+    num = num + 1;
+}
+put(10);

@@ -379,7 +379,7 @@ class StackMachine:
     def pop(self, amount, debug=False):
         assert 0 < self.dp
         assert 0 <= amount
-        code = 'pop: ' if debug else ''
+        code = f'pop {sanitize(amount)}: ' if debug else ''
         code += '<[-]' * amount
         self.dp -= amount
         return code + '\n' if debug else code

@@ -1,0 +1,45 @@
+{
+    var a = {
+        var c;
+        var ans;
+    } {
+        while {} 0 <= c & c < 10 {
+            ans = ans * 10 + c;
+            c = get() - 48;
+        }
+        return ans;
+    };
+    var b = {
+        var c;
+        var ans;
+    } {
+        while {} 0 <= c & c < 10 {
+            ans = ans * 10 + c;
+            c = get() - 48;
+        }
+        return ans;
+    };
+} {
+    while {} (a != 0) {
+        b = b % a;
+        b = {
+            var c = a;
+        } {
+            a = b;
+            return c;
+        };
+    }
+    {
+        var num = b;
+    } {
+        if {} num >= 100 {
+            put(num / 100 + 48);
+        }
+        if {} num >= 10 {
+            put(num % 100 / 10 + 48);
+        }
+        put(num % 10 + 48);
+    };
+    put(10);    
+}
+

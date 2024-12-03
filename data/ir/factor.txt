@@ -1,0 +1,63 @@
+{
+} {
+    while {
+        var count = 0;
+        arr factors[7];
+        var num = 2;
+    } num != 0 {
+        {
+            var num = num;
+        } {
+            if {} num >= 100 {
+                put(num / 100 + 48);
+            }
+            if {} num >= 10 {
+                put(num % 100 / 10 + 48);
+            }
+            put(num % 10 + 48);
+        };
+        put(32);
+        put(61);
+        put(32);
+
+        while {
+            var target = num;
+            var div = 2;
+        } target != 1 {
+            if {} target % div {
+                div = div + 1;
+            }else {
+                target = target / div;
+                factors[count] = div;
+                count = count + 1;
+            }
+        }
+
+        while {
+            var i = 0;
+        } i < count {
+            {
+                var num = factors[i];
+            } {
+                if {} num >= 100 {
+                    put(num / 100 + 48);
+                }
+                if {} num >= 10 {
+                    put(num % 100 / 10 + 48);
+                }
+                put(num % 10 + 48);
+            };
+
+            if {} i + 1 != count {
+                put(32);
+                put(42);
+                put(32);
+            } else {
+                put(10);
+            }
+            i = i + 1;
+        }
+        count = 0;
+        num = num + 1;
+    }
+}
