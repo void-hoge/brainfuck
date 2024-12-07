@@ -13,6 +13,10 @@ class Token(IntEnum):
     KW_IF = auto()  # if
     KW_ELSE = auto()  # else
     KW_FOR = auto()  # for
+    KW_VAR = auto()  # var
+    KW_ARR = auto()  # arr
+    KW_FN = auto()  # fn
+    KW_RETURN = auto()  # return
     AND = auto()  # &
     OR = auto()  # |
     NOT = auto()  # !
@@ -41,7 +45,7 @@ class Token(IntEnum):
     RBRACE = auto()  # }
     LBRACK = auto()  # [
     RBRACK = auto()  # ]
-    EOF = auto()
+    EOF = auto()  # end of file
 
 
 class LexicalAnalyzer:
@@ -63,12 +67,16 @@ class LexicalAnalyzer:
         if match := re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)', self.string[self.pos :]):
             head = match.group(1)
             self.pos += len(head)
-            if head in ['while', 'if', 'else', 'for']:
+            if head in ['while', 'if', 'else', 'for', 'var', 'arr', 'fn', 'return']:
                 t = {
                     'while': Token.KW_WHILE,
                     'if': Token.KW_IF,
                     'else': Token.KW_ELSE,
                     'for': Token.KW_FOR,
+                    'var': Token.KW_VAR,
+                    'arr': Token.KW_ARR,
+                    'fn': Token.KW_FN,
+                    'return': Token.KW_RETURN,
                 }[head]
                 return {
                     'type': t,
@@ -83,7 +91,7 @@ class LexicalAnalyzer:
                     'line': self.linecount,
                     'token': head,
                 }
-        elif match := re.match('^(\d+[a-zA-Z_]+)', self.string[self.pos :]):
+        elif match := re.match(r'^(\d+[a-zA-Z_]+)', self.string[self.pos :]):
             raise RuntimeError(f'Undefined token at line {self.linecount}: {match.group(1)}')
         elif match := re.match(r'^(\d+)', self.string[self.pos :]):
             head = match.group(1)
