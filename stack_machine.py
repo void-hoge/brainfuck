@@ -532,3 +532,54 @@ class StackMachine:
         code += mvp(-rpos - len(shape) + 1)
         self.dp -= len(shape) - 1
         return code + '\n' if debug else code
+
+    def load_hex(self, length, num, debug=False):
+        assert 0 <= num
+        assert 0 < length
+        code = f'loadhex {length} {num}: ' if debug else ''
+        for i in range(length)[::-1]:
+            code += self.load_constant(num // (16 ** i))
+            num %= 16 ** i
+        return code + '\n' if debug else code
+
+    def add_hex(self, length, debug=False):
+        assert 0 < length
+        assert length * 2 <= self.dp
+        code = f'addhex {length}: ' if debug else ''
+        code += '[-]'
+        for i in range(length):
+            code += '[-<+>]'
+            code += mvp(-length - 1)
+            code += multi_dst_add([length])
+            code += mvp(length)
+            code += '[->+>+<<]>>[-<<+>>]'
+            code += inc(16)
+            code += '>'
+            code += self.greater_or_equal()
+            code += f'<[[-]>+<<{inc(-16)}>]<'
+            code += multi_dst_add([-length])
+            code += '>>[-<<+>>]<<'
+        code += '[-]'
+        return code + '\n' if debug else code
+
+    def inv_hex(self, length, debug=False):
+        assert 0 < length
+        assert length <= self.dp
+        code = f'invhex {length}: ' if debug else ''
+        for i in range(length):
+            code += f'{inc(15)}'
+            code += mvp(-i - 1)
+            code += multi_dst_subtract([i + 1])
+            code += mvp(i + 1)
+            code += multi_dst_add([-i - 1])
+        code += self.load_hex(length, 1)
+        code += self.add_hex(length)
+        return code + '\n' if debug else code
+
+    def subtract_hex(self, length, debug=False):
+        assert 0 < length
+        assert length * 2 <= self.dp
+        code = f'subhex {length}: ' if debug else ''
+        code += self.inv_hex(length)
+        code += self.add_hex(length)
+        return code + '\n' if debug else code

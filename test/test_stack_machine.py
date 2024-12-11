@@ -1126,6 +1126,54 @@ class TestStackMachine(unittest.TestCase):
             print()
             print()
 
+    def test_052_sm_load_hex(self):
+        debug = True
+        dump = False
+        num = 114514
+        length = 6
+        sm = StackMachine()
+        code = 'sm load hex\n'
+        code += sm.multi_byte_load(length, num, debug)
+        out, dp, data = run(code, dump=dump)
+        self.assertEqual(
+            list(ord(ch) - ord('a') + 10 if ch in 'abcdef' else int(ch) for ch in f'{num:0{length}x}') + [0],
+            data)
+
+    def test_053_sm_add_hex(self):
+        debug = True
+        dump = False
+        sm = StackMachine()
+        code = 'sm add hex\n'
+        length = 16
+        import random
+        num1 = random.randint(0, 16 ** length)
+        num2 = random.randint(0, 16 ** length)
+        code += sm.load_hex(length, num1, debug)
+        code += sm.load_hex(length, num2, debug)
+        code += sm.add_hex(length, debug)
+        out, dp, data = run(code, dump=dump)
+        self.assertEqual(
+            list(ord(ch) - ord('a') + 10 if ch in 'abcdef' else int(ch) for ch in f'{num1 + num2:0{length}x}'[-length:]),
+            data[0:length]
+        )
+
+    def test_054_sm_subtract_hex(self):
+        debug = True
+        dump = False
+        sm = StackMachine()
+        code = 'sm add hex\n'
+        length = 16
+        import random
+        num1 = random.randint(0, 16 ** (length))
+        num2 = random.randint(0, 16 ** (length))
+        code += sm.load_hex(length, num1, debug)
+        code += sm.load_hex(length, num2, debug)
+        code += sm.subtract_hex(length, debug)
+        out, dp, data = run(code, dump=dump)
+        self.assertEqual(
+            list(ord(ch) - ord('a') + 10 if ch in 'abcdef' else int(ch) for ch in f'{num1 - num2 if num1 - num2 >= 0 else 16**length - (num2 - num1):0{length}x}'[-length:]),
+            data[0:length]
+        )
 
 if __name__ == '__main__':
     unittest.main()
