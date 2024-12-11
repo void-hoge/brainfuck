@@ -25,6 +25,24 @@ class Program:
         code += self.main.string(level)
         return code
 
+    def analyze_local_variables(self):
+        lvars = {}
+        for st in self.statements:
+            if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
+                lvars[st.name] = st
+            else:
+                assert False, 'Unreachable! In global scope, only initializers are allowed!'
+        return lvars
+
+    def codegen(self, level=0):
+        code = f'{indent(level)}{{\n'
+        for name, var in self.analyze_local_variables().items():
+            code += var.codegen(self.funcs, level + 1) + '\n'
+        code += f'{indent(level)}}} {{\n'
+        code += self.main.codegen(self.funcs, level + 1)
+        code += f'{indent(level)}}}\n'
+        return code
+
 
 class Function:
     def __init__(self, name, args, body):
@@ -36,6 +54,25 @@ class Function:
         code = f'{indent(level)}fn {self.name}({", ".join(arg.string(0, True) for arg in self.args)}) {{\n'
         code += self.body.string(level + 1)
         code += f'{indent(level)}}}'
+        return code
+
+    def analyze_local_variables(self):
+        lvars = {}
+        for arg in self.args:
+            if isinstance(arg, StInitVariable) or isinstance(arg, StInitArray):
+                lvars[arg.name] = arg
+        for name, var in self.body.analyze_local_variables().items():
+            lvars[name] = var
+        return lvars
+
+    def codegen(self, funcs, level):
+        lvars = self.analyze_local_variables()
+        code = f'{indent(level)}{{\n'
+        for name, var in lvars.items():
+            code += var.codegen(funcs, level)
+        code += f'{indent(level)}}} {{\n'
+        code += self.body.codegen(funcs, level + 1)
+        code += f'{indent(level)}}};\n'
         return code
 
 
@@ -51,6 +88,20 @@ class StList(Statement):
         code = ''
         for st in self.body:
             code += st.string(level) + '\n'
+        return code
+
+    def analyze_local_variables(self):
+        lvars = {}
+        for st in self.body:
+            if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
+                lvars[st.name] = st
+        return lvars
+
+    def codegen(self, funcs, level):
+        code = ''
+        for st in self.body:
+            if not isinstance(st, StInitVariable) and not isinstance(st, StInitArray):
+                code += st.codegen(funcs, level) + '\n'
         return code
 
 
@@ -74,6 +125,21 @@ class StAssign(Statement):
         else:
             return f'{indent(level)}{self.lhs} {op} {self.rhs};'
 
+    def codegen(self, funcs, level):
+        code = f'{indent(level)}{self.lhs} = '
+        if self.mode == Token.ASSIGN:
+            code += f'{self.rhs};'
+        else:
+            op = {
+                Token.ADDASSIGN: '+',
+                Token.SUBASSIGN: '-',
+                Token.MULASSIGN: '*',
+                Token.DIVASSIGN: '/',
+                Token.MODASSIGN: '%',
+            }[self.mode]
+            code += f'{self.lhs} {op} {self.rhs};'
+        return code
+
 
 class StReturn(Statement):
     def __init__(self, expr):
@@ -94,16 +160,56 @@ class StWhile(Statement):
         code += f'{indent(level)}}}'
         return code
 
+    def analyze_local_variables(self):
+        return self.body.analyze_local_variables()
+
+    def codegen(self, funcs, level):
+        code = f'{indent(level)}while {{\n'
+        for name, var in self.analyze_local_variables().items():
+            code += var.codegen(funcs, level + 1) + '\n'
+        code += f'{indent(level)}}} {self.cond} {{\n'
+        code += self.body.codegen(funcs, level + 1)
+        code += f'{indent(level)}}}'
+        return code
+
 
 class StIf(Statement):
-    def __init__(self, cond, body):
+    def __init__(self, cond, body_then, body_else=False):
         self.cond = cond
-        self.body = body
+        self.body_then = body_then
+        self.body_else = body_else
 
     def string(self, level):
         code = f'{indent(level)}if ({self.cond}) {{\n'
-        code += self.body.string(level + 1)
+        code += self.body_then.string(level + 1)
         code += f'{indent(level)}}}'
+        if self.body_else:
+            code += f'else {{\n'
+            code += self.body_else.string(level + 1)
+            code += f'{indent(level)}}}'
+        return code
+
+    def analyze_local_variables(self):
+        then_vars = self.body_then.analyze_local_variables()
+        else_vars = self.body_else.analyze_local_variables()
+        lvars = {}
+        for name, var in then_vars.items():
+            lvars[name] = var
+        for name, var in else_vars.items():
+            lvars[name] = var
+        return lvars
+
+    def codegen(self, funcs, level):
+        code = f'{indent(level)}if {{\n'
+        for name, var in self.analyze_local_variables().items():
+            code += var.codegen(funcs, level + 1) + '\n'
+        code += f'{indent(level)}}} {self.cond} {{\n'
+        code += self.body_then.codegen(funcs, level + 1)
+        code += f'{indent(level)}}}'
+        if self.body_else:
+            code += f'else {{\n'
+            code += self.body_else.codegen(funcs, level + 1)
+            code += f'{indent(level)}}}'
         return code
 
 
@@ -124,6 +230,26 @@ class StFor(Statement):
         code += f'{indent(level)}}}'
         return code
 
+    def analyze_local_variables(self):
+        lvars = {}
+        for init in self.inits:
+            if isinstance(init, StInitVariable) or isinstance(init, StInitArray):
+                lvars[init.name] = init
+        for name, var in self.body.analyze_local_variables():
+            lvars[name] = var
+        return lvars
+
+    def codegen(self, funcs, level):
+        lvars = self.analyze_local_variables()
+        code = f'{indent(level)}while {{\n'
+        for name, var in self.analyze_local_variables().items():
+            code += var.codegen(funcs, level + 1) + '\n'
+        code += f'{indent(level)}}} {self.cond} {{\n'
+        code += self.body.codegen(funcs, level + 1)
+        code += StList(self.reinits).codegen(funcs, level + 1)
+        code += f'{indent(level)}}}'
+        return code
+
 
 class StCall(Statement):
     def __init__(self, expr):
@@ -131,6 +257,9 @@ class StCall(Statement):
 
     def string(self, level):
         return f'{indent(level)}{self.expr};'
+
+    def codegen(self, funcs, level):
+        pass
 
 
 class StInitVariable(Statement):
@@ -150,6 +279,12 @@ class StInitVariable(Statement):
             else:
                 return f'{indent(level)}var {self.name};'
 
+    def codegen(self, funcs, level):
+        if self.rhs:
+            return f'{indent(level)}var {self.name} = {self.rhs};'
+        else:
+            return f'{indent(level)}var {self.name};'
+
 
 class StInitArray(Statement):
     def __init__(self, name, shape):
@@ -166,6 +301,13 @@ class StInitArray(Statement):
             for dim in self.shape:
                 code += f'[{dim}]'
             code += ';'
+        return code
+
+    def codegen(self, funcs, level):
+        code = f'{indent(level)}arr {self.name}'
+        for dim in self.shape:
+            code += f'[{dim}]'
+        code += ';'
         return code
 
 
@@ -218,7 +360,7 @@ class ExpCharacter(Expression):
         self.value = value
 
     def __str__(self):
-        return repr(chr(self.value))
+        return str(self.value)
 
     def evaluate(self):
         return self.valure
@@ -444,7 +586,7 @@ class Parser:
             self.match(Token.COMMA)
         self.expect(Token.RPAREN)
         self.expect(Token.LBRACE)
-        body = self.parse_statement_list(tables + [lvars])
+        body, _ = self.parse_statement_list(tables, lvars)
         self.expect(Token.RBRACE)
         return Function(funcname, args, body)
 
@@ -489,8 +631,7 @@ class Parser:
                 lvars[arr.name] = {'type': 'array', 'shape': arr.shape}
                 inits += [arr]
             else:
-                assign = self.parse_assignment(tables + [lvars], tail=None)
-                inits += [assign]
+                raise SyntaxError(f'Expected {repr(Token.KW_VAR)} or {repr(Token.ARR)}, got {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.')
             self.match(Token.COMMA)
         self.expect(Token.SEMICOLON)
         cond = self.parse_expression(tables + [lvars])
@@ -500,7 +641,7 @@ class Parser:
             reinits += [self.parse_assignment(tables + [lvars], tail=None)]
         self.expect(Token.RPAREN)
         self.expect(Token.LBRACE)
-        body = self.parse_statement_list(tables + [lvars], appendmode=True)
+        body, _ = self.parse_statement_list(tables, lvars)
         self.expect(Token.RBRACE)
         return StFor(inits, cond, reinits, body)
 
@@ -508,7 +649,7 @@ class Parser:
         self.expect(Token.KW_WHILE)
         cond = self.parse_expression(tables)
         self.expect(Token.LBRACE)
-        body = self.parse_statement_list(tables)
+        body, lvars = self.parse_statement_list(tables, {})
         self.expect(Token.RBRACE)
         return StWhile(cond, body)
 
@@ -516,16 +657,18 @@ class Parser:
         self.expect(Token.KW_IF)
         cond = self.parse_expression(tables)
         self.expect(Token.LBRACE)
-        body = self.parse_statement_list(tables)
+        body_then, lvars = self.parse_statement_list(tables, {})
         self.expect(Token.RBRACE)
-        return StIf(cond, body)
-
-    def parse_statement_list(self, tables, appendmode=False):
-        if appendmode:
-            lvars = tables[-1]
-            tables.pop()
+        if self.peek()['type'] == Token.KW_ELSE:
+            self.seek()
+            self.expect(Token.LBRACE)
+            body_else, _ = self.parse_statement_list(tables, lvars)
+            self.expect(Token.RBRACE)
+            return StIf(cond, body_then, body_else)
         else:
-            lvars = {}
+            return StIf(cond, body_then)
+
+    def parse_statement_list(self, tables, lvars):
         statements = []
         while self.peek()['type'] != Token.RBRACE:
             if self.peek()['type'] == Token.KW_VAR:
@@ -563,7 +706,7 @@ class Parser:
                     statements += [self.parse_assignment(tables)]
             else:
                 raise SyntaxError(f'Unexpected token {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.')
-        return StList(statements)
+        return StList(statements), lvars
 
     def parse_init_variable(self, tables, tail=Token.SEMICOLON):
         self.expect(Token.KW_VAR)
@@ -754,4 +897,5 @@ if __name__ == '__main__':
     lex.analyze()
     parser = Parser(lex)
     tables = []
-    print(parser.parse_program(tables).string(0))
+    result = parser.parse_program(tables)
+    print(result.codegen())
