@@ -1,0 +1,13 @@
+var a;
+fn main() {
+    while (0) {
+        var a;
+        a += 1;
+    }
+    if (a) {
+        var t;
+    }else {
+        var e;
+    }
+    for (var i = 'a'; i <= 'z'; i += 1) {}
+}

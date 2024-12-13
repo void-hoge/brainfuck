@@ -539,13 +539,6 @@ class Parser:
         else:
             raise SyntaxError(f"Expected {repr(token_type)}, got {repr(token['type'])} in line {token['line'] + 1}.")
 
-    def match(self, token_type):
-        token = self.peek()
-        if token['type'] == token_type:
-            self.seek()
-            return True
-        return False
-
     def parse_program(self):
         block = self.parse_block_expression()
         self.expect(Token.EOF)
@@ -699,6 +692,10 @@ class Parser:
                 return ExpArrayElement(token['token'], indices)
             else:
                 return ExpVariable(token['token'])
+        else:
+            raise SyntaxError(
+                f'Expected {repr(Token.ID)}, got {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.'
+            )
 
     def parse_block_statement(self):
         block = self.parse_block_expression()
@@ -836,7 +833,7 @@ class Compiler:
 
 if __name__ == '__main__':
     import sys
-    
+
     with open(sys.argv[1]) as f:
         prog = f.read()
     debug = True
@@ -847,4 +844,3 @@ if __name__ == '__main__':
     else:
         for i in range(0, len(code), 80):
             print(code[i : i + 80])
-

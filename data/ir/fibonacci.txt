@@ -1,0 +1,15 @@
+{
+    var ans;
+}{
+    ans = {
+        arr stack[256];
+        var sp;
+        var base;
+        arr state[2];
+        var fib_n;
+        var fib_
+    } {
+        while {} sp != 255 {
+        }
+    };
+}
