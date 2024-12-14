@@ -28,7 +28,10 @@ class Program:
         code = ''
         sm = StackMachine()
         for st in self.statements:
-            code += st.codegen(sm, self.funcs, tables, debug)
+            if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
+                code += st.allocate(sm, self.funcs, tables, debug)
+            else:
+                code += st.codegen(sm, self.funcs, tables, debug)
         return code
 
 
@@ -126,18 +129,18 @@ class StWhile(Statement):
         return code
 
     def codegen(self, sm, funcs, tables, debug):
-        retpos = sm.dp
+        base = sm.dp
+        lvars = {}
         code = ''
         for st in self.body:
             if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
-                code += st.codegen(sm, funcs, tables, debug)
-        size = sm.dp - retpos
-        code += self.cond.codegen(sm, funcs, tables, debug)
+                code += st.allocate(sm, funcs, tables + [lvars], debug)
+        size = sm.dp - base
+        code += self.cond.codegen(sm, funcs, tables + [lvars], debug)
         code += sm.begin_while(debug)
         for st in self.body:
-            if not (isinstance(st, StInitVariable) or isinstance(st, StInitArray)):
-                code += st.codegen(sm, funcs, tables, debug)
-        code += self.cond.codegen(sm, funcs, tables, debug)
+            code += st.codegen(sm, funcs, tables + [lvars], debug)
+        code += self.cond.codegen(sm, funcs, tables + [lvars], debug)
         code += sm.end_while(debug)
         code += sm.pop(size, debug)
         return code
@@ -161,6 +164,30 @@ class StIf(Statement):
             code += f'{indent(level)}}}'
         return code
 
+    def codegen(self, sm, funcs, tables, debug):
+        base = sm.dp
+        lvars = {}
+        code = ''
+        for st in self.body_then:
+            if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
+                code += st.allocate(sm, funcs, tables + [lvars], debug)
+        if self.body_else:
+            for st in self.body_else:
+                if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
+                    code += st.allocate(sm, funcs, tables + [lvars], debug)
+        size = sm.dp - base
+        code += self.cond.codegen(sm, funcs, tables + [lvars], debug)
+        code += sm.begin_if(debug)
+        for st in self.body_then:
+            code += st.codegen(sm, funcs, tables + [lvars], debug)
+        code += sm.begin_else(debug)
+        if self.body_else:
+            for st in self.body_else:
+                code += st.codegen(sm, funcs, tables + [lvars], debug)
+        code += sm.end_if(debug)
+        code += sm.pop(size, debug)
+        return code
+
 
 class StFor(Statement):
     def __init__(self, inits, cond, reinits, body):
@@ -180,6 +207,30 @@ class StFor(Statement):
         code += f'{indent(level)}}}'
         return code
 
+    def codegen(self, sm, funcs, tables, debug):
+        base = sm.dp
+        lvars = {}
+        code = ''
+        for st in self.inits:
+            if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
+                code += st.allocate(sm, funcs, tables + [lvars], debug)
+            else:
+                code += st.codegen(sm, funcs, tables + [lvars], debug)
+        for st in self.body:
+            if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
+                code += st.allocate(sm, funcs, tables + [lvars], debug)
+        size = sm.dp - base
+        code += self.cond.codegen(sm, funcs, tables + [lvars], debug)
+        code += sm.begin_while(debug)
+        for st in self.body:
+            code += st.codegen(sm, funcs, tables + [lvars], debug)
+        for st in self.reinits:
+            code += st.codegen(sm, funcs, tables + [lvars], debug)
+        code += self.cond.codegen(sm, funcs, tables + [lvars], debug)
+        code += sm.end_while(debug)
+        code += sm.pop(size, debug)
+        return code
+
 
 class StCall(Statement):
     def __init__(self, expr):
@@ -188,6 +239,63 @@ class StCall(Statement):
     def string(self, level):
         return f'{indent(level)}{self.expr};'
 
+    def builtin_putchar(self, sm, funcs, tables, debug):
+        if len(self.expr.args) != 1:
+            raise SyntaxError(f'Number of arguments of the built-in putchar is 1.')
+        code = self.expr.args[0].codegen(sm, funcs, tables, debug)
+        code += sm.put_character(debug)
+        return code
+
+    def builtin_putint(self, sm, funcs, tables, debug):
+        if len(self.expr.args) != 1:
+            raise SyntaxError(f'Number of arguments of the built-in putchar is 1.')
+        pos = sm.dp
+        code = self.expr.args[0].codegen(sm, funcs, tables, debug)
+        code += sm.load_variable(pos, debug)
+        code += sm.load_constant(100, debug)
+        code += sm.greater_or_equal(debug)
+        code += sm.begin_if(debug)
+        code += sm.load_variable(pos, debug)
+        code += sm.load_constant(100, debug)
+        code += sm.divide(debug)
+        code += sm.load_constant(48, debug)
+        code += sm.add(debug)
+        code += sm.put_character(debug)
+        code += sm.begin_else(debug)
+        code += sm.end_if(debug)
+        code += sm.load_variable(pos, debug)
+        code += sm.load_constant(10, debug)
+        code += sm.greater_or_equal(debug)
+        code += sm.begin_if(debug)
+        code += sm.load_variable(pos, debug)
+        code += sm.load_constant(100, debug)
+        code += sm.modulo(debug)
+        code += sm.load_constant(10, debug)
+        code += sm.divide(debug)
+        code += sm.load_constant(48, debug)
+        code += sm.add(debug)
+        code += sm.put_character(debug)
+        code += sm.begin_else(debug)
+        code += sm.end_if(debug)
+        code += sm.load_variable(pos, debug)
+        code += sm.load_constant(10, debug)
+        code += sm.modulo(debug)
+        code += sm.load_constant(48, debug)
+        code += sm.add(debug)
+        code += sm.put_character(debug)
+        code += sm.pop(1, debug)
+        return code
+
+    def codegen(self, sm, funcs, tables, debug):
+        if self.expr.name == 'putchar':
+            return self.builtin_putchar(sm, funcs, tables, debug)
+        elif self.expr.name == 'putint':
+            return self.builtin_putint(sm, funcs, tables, debug)
+        else:
+            base = sm.dp
+            code = self.expr.codegen(sm, funcs, tables, debug)
+            code += sm.pop(sm.dp - base, debug)
+            return code
 
 class StInitVariable(Statement):
     def __init__(self, name, rhs=None):
@@ -207,6 +315,12 @@ class StInitVariable(Statement):
                 return f'{indent(level)}var {self.name};'
 
     def codegen(self, sm, funcs, tables, debug):
+        if self.rhs:
+            return StAssign(ExpVariable(self.name), Token.ASSIGN, self.rhs).codegen(sm, funcs, tables, debug)
+        else:
+            return ''
+
+    def allocate(self, sm, funcs, tables, debug):
         assert self.name not in tables[-1]
         tables[-1][self.name] = {'type': 'variable', 'pos': sm.dp, 'size': 1}
         code = ''
@@ -250,6 +364,9 @@ class StInitArray(Statement):
         return rec(shape, 0)
 
     def codegen(self, sm, funcs, tables, debug):
+        return ''
+
+    def allocate(self, sm, funcs, tables, debug):
         assert self.name not in tables[-1]
         code = sm.push_multi_dim_array(self.eval_shape(), debug)
         tables[-1][self.name] = {'type': 'array', 'pos': sm.dp, 'size': self.totalsize(), 'shape': self.eval_shape()}
@@ -267,6 +384,46 @@ class ExpCall(Expression):
 
     def __str__(self):
         return f'{self.name}({", ".join(str(arg) for arg in self.args)})'
+
+    def builtin_getchar(self, sm, funcs, tables, debug):
+        return sm.get_character(debug)
+
+    def builtin_getint(self, sm, funcs, tables, debug):
+        code = ''
+        ret_pos = sm.dp
+        code += sm.load_constant(0, debug)
+        inp_pos = sm.dp
+        code += sm.load_constant(0, debug)
+        code += sm.load_constant(1, debug)
+        code += sm.begin_while(debug)
+        code += sm.load_variable(ret_pos, debug)
+        code += sm.load_constant(10, debug)
+        code += sm.multiply(debug)
+        code += sm.load_variable(inp_pos, debug)
+        code += sm.add(debug)
+        code += sm.store_variable(ret_pos, debug)
+        code += sm.get_character(debug)
+        code += sm.load_constant(48, debug)
+        code += sm.subtract(debug)
+        code += sm.store_variable(inp_pos, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.load_variable(inp_pos, debug)
+        code += sm.less_or_equal(debug)
+        code += sm.load_variable(inp_pos, debug)
+        code += sm.load_constant(10, debug)
+        code += sm.less_than(debug)
+        code += sm.booland(debug)
+        code += sm.end_while(debug)
+        code += sm.pop(1, debug)
+        return code
+
+    def codegen(self, sm, funcs, tables, debug):
+        if self.name == 'getchar':
+            return self.builtin_getchar(sm, funcs, tables, debug)
+        elif self.name == 'getint':
+            return self.builtin_getint(sm, funcs, tables, debug)
+        else:
+            return NotImplemented
 
 
 class ExpArrayElement(Expression):
@@ -687,7 +844,7 @@ class Parser:
             return StIf(cond, body_then, body_else)
         else:
             return StIf(cond, body_then)
-        
+
     def parse_statement(self, tables, enable_return=False):
         if self.peek()['type'] == Token.KW_VAR:
             return self.parse_init_variable(tables)
