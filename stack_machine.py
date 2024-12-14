@@ -538,8 +538,8 @@ class StackMachine:
         assert 0 < length
         code = f'loadhex {length} {num}: ' if debug else ''
         for i in range(length)[::-1]:
-            code += self.load_constant(num // (16 ** i))
-            num %= 16 ** i
+            code += self.load_constant(num // (16**i))
+            num %= 16**i
         return code + '\n' if debug else code
 
     def add_hex(self, length, debug=False):

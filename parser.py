@@ -32,7 +32,13 @@ class Program:
                 code += st.allocate(sm, self.funcs, tables, debug)
             else:
                 code += st.codegen(sm, self.funcs, tables, debug)
-        return code
+        if debug:
+            return code
+        else:
+            prog = ''
+            for i in range(0, len(code), 80):
+                prog += code[i : i + 80] + '\n'
+            return prog
 
 
 class Function:
@@ -297,6 +303,7 @@ class StCall(Statement):
             code += sm.pop(sm.dp - base, debug)
             return code
 
+
 class StInitVariable(Statement):
     def __init__(self, name, rhs=None):
         self.name = name
@@ -424,6 +431,9 @@ class ExpCall(Expression):
             return self.builtin_getint(sm, funcs, tables, debug)
         else:
             return NotImplemented
+
+    def extract_calls(self, calls):
+        pass
 
 
 class ExpArrayElement(Expression):
@@ -594,7 +604,7 @@ class ExpRelational(Expression):
             return code + sm.greater_than(debug)
         elif self.mode == Token.LE:
             return code + sm.less_or_equal(debug)
-        else: # self.mode == Token.GE:
+        else:  # self.mode == Token.GE:
             return code + sm.greater_or_equal(debug)
 
 
@@ -625,7 +635,7 @@ class ExpAdditive(Expression):
         code += self.right.codegen(sm, funcs, tables, debug)
         if self.mode == Token.PLUS:
             return code + sm.add(debug)
-        else: #self.mode == Token.MINUS
+        else:  # self.mode == Token.MINUS
             return code + sm.subtract(debug)
 
 
@@ -661,7 +671,7 @@ class ExpMultiplicative(Expression):
             return code + sm.multiply(debug)
         elif self.mode == Token.SLASH:
             return code + sm.divide(debug)
-        else: # self.mode == Token.PERCENT
+        else:  # self.mode == Token.PERCENT
             return code + sm.modulo(debug)
 
 
@@ -738,7 +748,9 @@ class Parser:
     def parse_function(self, tables):
         self.expect(Token.KW_FN)
         if self.peek()['type'] != Token.ID:
-            raise SyntaxError(f'Expected {repr(Token.ID)}, got {repr(self.peek()["type"])} in line {token["line"] + 1}.')
+            raise SyntaxError(
+                f'Expected {repr(Token.ID)}, got {repr(self.peek()["type"])} in line {token["line"] + 1}.'
+            )
         funcname = self.peek()['token']
         self.seek()
         self.expect(Token.LPAREN)
@@ -750,7 +762,9 @@ class Parser:
             elif self.peek()['type'] == Token.KW_ARR:
                 args += [self.parse_init_array(tables + [lvars], tail=None)]
             else:
-                raise SyntaxError(f'Unexpected token {repr(Token.KW_VAR)} or {repr(Token.KW_ARR)}, got {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.')
+                raise SyntaxError(
+                    f'Unexpected token {repr(Token.KW_VAR)} or {repr(Token.KW_ARR)}, got {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.'
+                )
             self.match(Token.COMMA)
         self.expect(Token.RPAREN)
         self.expect(Token.LBRACE)
@@ -798,7 +812,9 @@ class Parser:
             elif self.peek()['type'] == Token.KW_ARR:
                 inits += [self.parse_init_array(tables + [lvars], tail=None)]
             else:
-                raise SyntaxError(f'Expected {repr(Token.KW_VAR)} or {repr(Token.ARR)}, got {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.')
+                raise SyntaxError(
+                    f'Expected {repr(Token.KW_VAR)} or {repr(Token.ARR)}, got {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.'
+                )
             self.match(Token.COMMA)
         self.expect(Token.SEMICOLON)
         cond = self.parse_expression(tables + [lvars])
@@ -874,7 +890,6 @@ class Parser:
         else:
             raise SyntaxError(f'Unexpected token {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.')
 
-
     def parse_init_variable(self, tables, tail=Token.SEMICOLON, enable_init=True):
         self.expect(Token.KW_VAR)
         if self.peek()['type'] == Token.ID:
@@ -911,7 +926,7 @@ class Parser:
                 self.expect(Token.LBRACK)
                 shape += [self.parse_expression(tables)]
                 self.expect(Token.RBRACK)
-            tables[-1][name] = {'type':'array', 'shape': [dim.evaluate() for dim in shape]}
+            tables[-1][name] = {'type': 'array', 'shape': [dim.evaluate() for dim in shape]}
         else:
             raise SyntaxError(
                 f'Expected {repr(Token.ID)}, got {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.'
@@ -941,7 +956,9 @@ class Parser:
                 if not var:
                     raise SyntaxError(f'Undefined array named {token["token"]} in line {token["line"] + 1}.')
                 if len(var['shape']) != len(indices):
-                    raise SyntaxError(f'The left-hand-side of the assign must be a reference of a single byte, in line {token["line"] + 1}.')
+                    raise SyntaxError(
+                        f'The left-hand-side of the assign must be a reference of a single byte, in line {token["line"] + 1}.'
+                    )
                 return expr
             else:
                 return ExpVariable(token['token'])
@@ -1018,7 +1035,9 @@ class Parser:
 
     def parse_expcall(self, tables):
         if self.peek()['type'] != Token.ID:
-            raise SyntaxError(f'Expected {repr(Token.ID)}, got {repr(self.peek()["type"])} in line {token["line"] + 1}.')
+            raise SyntaxError(
+                f'Expected {repr(Token.ID)}, got {repr(self.peek()["type"])} in line {token["line"] + 1}.'
+            )
         token = self.peek()
         self.seek()
         self.expect(Token.LPAREN)
@@ -1028,7 +1047,6 @@ class Parser:
             self.match(Token.COMMA)
         self.expect(Token.RPAREN)
         return ExpCall(token['token'], args)
-
 
     def parse_primary_expression(self, tables):
         if self.peek()['type'] == Token.ID:
@@ -1077,6 +1095,7 @@ class Parser:
 
 if __name__ == '__main__':
     import sys
+
     debug = True
     with open(sys.argv[1]) as f:
         prog = f.read()
