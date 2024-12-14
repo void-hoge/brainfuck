@@ -11,36 +11,16 @@ def indent(level):
 
 
 class Program:
-    def __init__(self, statements, funcs, main):
+    def __init__(self, statements, funcs):
         self.statements = statements
         self.funcs = funcs
-        self.main = main
 
     def string(self, level=0):
         code = ''
-        for statement in self.statements:
-            code += statement.string(level) + '\n'
         for name, func in self.funcs.items():
             code += func.string(level) + '\n'
-        code += self.main.string(level)
-        return code
-
-    def analyze_local_variables(self):
-        lvars = {}
-        for st in self.statements:
-            if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
-                lvars[st.name] = st
-            else:
-                assert False, 'Unreachable! In global scope, only initializers are allowed!'
-        return lvars
-
-    def codegen(self, level=0):
-        code = f'{indent(level)}{{\n'
-        for name, var in self.analyze_local_variables().items():
-            code += var.codegen(self.funcs, level + 1) + '\n'
-        code += f'{indent(level)}}} {{\n'
-        code += self.main.codegen(self.funcs, level + 1)
-        code += f'{indent(level)}}}\n'
+        for statement in self.statements:
+            code += statement.string(level) + '\n'
         return code
 
 
@@ -52,57 +32,14 @@ class Function:
 
     def string(self, level):
         code = f'{indent(level)}fn {self.name}({", ".join(arg.string(0, True) for arg in self.args)}) {{\n'
-        code += self.body.string(level + 1)
+        for st in self.body:
+            code += st.string(level + 1) + '\n'
         code += f'{indent(level)}}}'
-        return code
-
-    def analyze_local_variables(self):
-        lvars = {}
-        for arg in self.args:
-            if isinstance(arg, StInitVariable) or isinstance(arg, StInitArray):
-                lvars[arg.name] = arg
-        for name, var in self.body.analyze_local_variables().items():
-            lvars[name] = var
-        return lvars
-
-    def codegen(self, funcs, level):
-        lvars = self.analyze_local_variables()
-        code = f'{indent(level)}{{\n'
-        for name, var in lvars.items():
-            code += var.codegen(funcs, level)
-        code += f'{indent(level)}}} {{\n'
-        code += self.body.codegen(funcs, level + 1)
-        code += f'{indent(level)}}};\n'
         return code
 
 
 class Statement:
     pass
-
-
-class StList(Statement):
-    def __init__(self, body):
-        self.body = body
-
-    def string(self, level):
-        code = ''
-        for st in self.body:
-            code += st.string(level) + '\n'
-        return code
-
-    def analyze_local_variables(self):
-        lvars = {}
-        for st in self.body:
-            if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
-                lvars[st.name] = st
-        return lvars
-
-    def codegen(self, funcs, level):
-        code = ''
-        for st in self.body:
-            if not isinstance(st, StInitVariable) and not isinstance(st, StInitArray):
-                code += st.codegen(funcs, level) + '\n'
-        return code
 
 
 class StAssign(Statement):
@@ -125,21 +62,6 @@ class StAssign(Statement):
         else:
             return f'{indent(level)}{self.lhs} {op} {self.rhs};'
 
-    def codegen(self, funcs, level):
-        code = f'{indent(level)}{self.lhs} = '
-        if self.mode == Token.ASSIGN:
-            code += f'{self.rhs};'
-        else:
-            op = {
-                Token.ADDASSIGN: '+',
-                Token.SUBASSIGN: '-',
-                Token.MULASSIGN: '*',
-                Token.DIVASSIGN: '/',
-                Token.MODASSIGN: '%',
-            }[self.mode]
-            code += f'{self.lhs} {op} {self.rhs};'
-        return code
-
 
 class StReturn(Statement):
     def __init__(self, expr):
@@ -156,21 +78,13 @@ class StWhile(Statement):
 
     def string(self, level):
         code = f'{indent(level)}while ({self.cond}) {{\n'
-        code += self.body.string(level + 1)
+        for st in self.body:
+            code += st.string(level + 1) + '\n'
         code += f'{indent(level)}}}'
         return code
 
     def analyze_local_variables(self):
         return self.body.analyze_local_variables()
-
-    def codegen(self, funcs, level):
-        code = f'{indent(level)}while {{\n'
-        for name, var in self.analyze_local_variables().items():
-            code += var.codegen(funcs, level + 1) + '\n'
-        code += f'{indent(level)}}} {self.cond} {{\n'
-        code += self.body.codegen(funcs, level + 1)
-        code += f'{indent(level)}}}'
-        return code
 
 
 class StIf(Statement):
@@ -181,34 +95,13 @@ class StIf(Statement):
 
     def string(self, level):
         code = f'{indent(level)}if ({self.cond}) {{\n'
-        code += self.body_then.string(level + 1)
+        for st in self.body_then:
+            code += st.string(level + 1) + '\n'
         code += f'{indent(level)}}}'
         if self.body_else:
             code += f'else {{\n'
-            code += self.body_else.string(level + 1)
-            code += f'{indent(level)}}}'
-        return code
-
-    def analyze_local_variables(self):
-        then_vars = self.body_then.analyze_local_variables()
-        else_vars = self.body_else.analyze_local_variables()
-        lvars = {}
-        for name, var in then_vars.items():
-            lvars[name] = var
-        for name, var in else_vars.items():
-            lvars[name] = var
-        return lvars
-
-    def codegen(self, funcs, level):
-        code = f'{indent(level)}if {{\n'
-        for name, var in self.analyze_local_variables().items():
-            code += var.codegen(funcs, level + 1) + '\n'
-        code += f'{indent(level)}}} {self.cond} {{\n'
-        code += self.body_then.codegen(funcs, level + 1)
-        code += f'{indent(level)}}}'
-        if self.body_else:
-            code += f'else {{\n'
-            code += self.body_else.codegen(funcs, level + 1)
+            for st in self.body_else:
+                code += st.string(level + 1) + '\n'
             code += f'{indent(level)}}}'
         return code
 
@@ -226,27 +119,8 @@ class StFor(Statement):
         code += str(self.cond) + ';'
         code += ','.join(reinit.string(0, True) for reinit in self.reinits) + ') '
         code += f'{{\n'
-        code += self.body.string(level + 1)
-        code += f'{indent(level)}}}'
-        return code
-
-    def analyze_local_variables(self):
-        lvars = {}
-        for init in self.inits:
-            if isinstance(init, StInitVariable) or isinstance(init, StInitArray):
-                lvars[init.name] = init
-        for name, var in self.body.analyze_local_variables():
-            lvars[name] = var
-        return lvars
-
-    def codegen(self, funcs, level):
-        lvars = self.analyze_local_variables()
-        code = f'{indent(level)}while {{\n'
-        for name, var in self.analyze_local_variables().items():
-            code += var.codegen(funcs, level + 1) + '\n'
-        code += f'{indent(level)}}} {self.cond} {{\n'
-        code += self.body.codegen(funcs, level + 1)
-        code += StList(self.reinits).codegen(funcs, level + 1)
+        for st in self.body:
+            code += st.string(level + 1) + '\n'
         code += f'{indent(level)}}}'
         return code
 
@@ -257,9 +131,6 @@ class StCall(Statement):
 
     def string(self, level):
         return f'{indent(level)}{self.expr};'
-
-    def codegen(self, funcs, level):
-        pass
 
 
 class StInitVariable(Statement):
@@ -279,11 +150,15 @@ class StInitVariable(Statement):
             else:
                 return f'{indent(level)}var {self.name};'
 
-    def codegen(self, funcs, level):
+    def codegen(self, sm, tables, debug):
+        assert self.name not in tables[-1]
+        tables[-1][self.name] = {'type': 'variable', 'pos': sm.dp, 'size': 1}
+        code = ''
         if self.rhs:
-            return f'{indent(level)}var {self.name} = {self.rhs};'
+            code += self.rhs.codegen(sm, funcs, tables, debug)
         else:
-            return f'{indent(level)}var {self.name};'
+            code += sm.load_constant(0, debug)
+        return code
 
 
 class StInitArray(Statement):
@@ -303,11 +178,25 @@ class StInitArray(Statement):
             code += ';'
         return code
 
-    def codegen(self, funcs, level):
-        code = f'{indent(level)}arr {self.name}'
-        for dim in self.shape:
-            code += f'[{dim}]'
-        code += ';'
+    def eval_shape(self):
+        return [dim.evaluate() for dim in self.shape]
+
+    def totalsize(self):
+        shape = self.eval_shape()
+
+        def rec(shape, dim):
+            if len(shape) - 1 == dim:
+                return shape[dim] + 4
+            else:
+                return (rec(shape, dim + 1) + 1) * shape[dim]
+            return rec(shape, dim)
+
+        return rec(shape, 0)
+
+    def codegen(self, sm, funcs, tables, debug):
+        assert self.name not in tables[-1]
+        code = sm.push_multi_dim_array(self.eval_shape(), debug)
+        tables[-1][self.name] = {'type': 'array', 'pos': sm.dp, 'size': self.totalsize(), 'shape': self.eval_shape()}
         return code
 
 
@@ -335,6 +224,16 @@ class ExpArrayElement(Expression):
             code += f'[{idx}]'
         return code
 
+    def codegen(self, funcs, tables, debug):
+        arr = next((table[self.name] for table in tables[::-1] if self.name in table), None)
+        assert arr
+        assert arr['type'] == 'array'
+        code = ''
+        for idx in self.indices[::-1]:
+            code += idx.codegen(sm, funcs, debug)
+        code += sm.multi_dim_load(arr['pos'], arr['shape'], debug)
+        return code
+
 
 class ExpVariable(Expression):
     def __init__(self, name):
@@ -342,6 +241,12 @@ class ExpVariable(Expression):
 
     def __str__(self):
         return self.name
+
+    def codegen(self, funcs, tables, debug):
+        var = next((table[self.name] for table in tables[::-1] if self.name in table), None)
+        assert var
+        assert var['type'] == 'variable'
+        return sm.load_variable(var['pos'], debug)
 
 
 class ExpInteger(Expression):
@@ -354,6 +259,9 @@ class ExpInteger(Expression):
     def evaluate(self):
         return self.value
 
+    def codegen(self, funcs, tables, debug):
+        return sm.load_constant(self.value, debug)
+
 
 class ExpCharacter(Expression):
     def __init__(self, value):
@@ -363,7 +271,10 @@ class ExpCharacter(Expression):
         return str(self.value)
 
     def evaluate(self):
-        return self.valure
+        return self.value
+
+    def codegen(self, funcs, tables, debug):
+        return sm.load_constant(self.value, debug)
 
 
 class ExpLogicalOr(Expression):
@@ -377,6 +288,12 @@ class ExpLogicalOr(Expression):
     def evaluate(self):
         return int(int(self.left.evaluate()) | int(self.right.evaluate()))
 
+    def codegen(self, funcs, tables, debug):
+        code = ''
+        code += self.left.codegen(sm, funcs, tables, debug)
+        code += self.right.codegen(sm, funcs, tables, debug)
+        return code + sm.boolor(debug)
+
 
 class ExpLogicalAnd(Expression):
     def __init__(self, left, right):
@@ -388,6 +305,12 @@ class ExpLogicalAnd(Expression):
 
     def evaluate(self):
         return int(int(self.left.evaluate()) & int(self.right.evaluate()))
+
+    def codegen(self, funcs, tables, debug):
+        code = ''
+        code += self.left.codegen(sm, funcs, tables, debug)
+        code += self.right.codegen(sm, funcs, tables, debug)
+        return code + sm.booland(debug)
 
 
 class ExpEquality(Expression):
@@ -402,10 +325,19 @@ class ExpEquality(Expression):
     def evaluate(self):
         left = int(self.left.evaluate())
         right = int(self.right.evaluate())
-        if self.mode == '==':
+        if self.mode == Token.EQ:
             return int(left == right)
         else:
             return int(left != right)
+
+    def codegen(self, funcs, tables, debug):
+        code = ''
+        code += self.left.codegen(sm, funcs, tables, debug)
+        code += self.right.codegen(sm, funcs, tables, debug)
+        if self.mode == Token.EQ:
+            return code + sm.equal(debug)
+        else:
+            return code + sm.notequal(debug)
 
 
 class ExpRelational(Expression):
@@ -420,14 +352,27 @@ class ExpRelational(Expression):
     def evaluate(self):
         left = int(self.left.evaluate())
         right = int(self.right.evaluate())
-        if self.mode == '<':
+        if self.mode == Token.LT:
             return int(left < right)
-        elif self.mode == '>':
+        elif self.mode == Token.GT:
             return int(left > right)
-        elif self.mode == '<=':
+        elif self.mode == Token.LE:
             return int(left <= right)
-        else:  # self.mode == '>=':
+        else:  # self.mode == Token.GE:
             return int(left >= right)
+
+    def codegen(self, funcs, tables, debug):
+        code = ''
+        code += self.left.codegen(sm, funcs, tables, debug)
+        code += self.right.codegen(sm, funcs, tables, debug)
+        if self.mode == Token.LT:
+            return code + sm.less_than(debug)
+        elif self.mode == Token.GT:
+            return code + sm.greater_than(debug)
+        elif self.mode == Token.LE:
+            return code + sm.less_or_equal(debug)
+        else: # self.mode == Token.GE:
+            return code + sm.greater_or_equal(debug)
 
 
 class ExpAdditive(Expression):
@@ -442,10 +387,19 @@ class ExpAdditive(Expression):
     def evaluate(self):
         left = int(self.left.evaluate())
         right = int(self.right.evaluate())
-        if self.mode == '+':
+        if self.mode == Token.PLUS:
             return int(left + right)
-        else:  # self.mode == '-'
+        else:  # self.mode == Token.MINUS
             return int(left - right)
+
+    def codegen(self, funcs, tables, debug):
+        code = ''
+        code += self.left.codegen(sm, funcs, tables, debug)
+        code += self.right.codegen(sm, funcs, tables, debug)
+        if self.mode == Token.PLUS:
+            return code + sm.add(debug)
+        else: #self.mode == Token.MINUS
+            return code + sm.subtract(debug)
 
 
 class ExpMultiplicative(Expression):
@@ -460,12 +414,23 @@ class ExpMultiplicative(Expression):
     def evaluate(self):
         left = int(self.left.evaluate())
         right = int(self.right.evaluate())
-        if self.mode == '*':
+        if self.mode == Token.STAR:
             return int(left * right)
-        elif self.mode == '/':
+        elif self.mode == Token.SLASH:
             return int(left // right)
-        else:  # self.mode == '%'
+        else:  # self.mode == Token.PERCENT
             return int(left % right)
+
+    def codegen(self, funcs, tables, debug):
+        code = ''
+        code += self.left.codegen(sm, funcs, tables, debug)
+        code += self.right.codegen(sm, funcs, tables, debug)
+        if self.mode == Token.STAR:
+            return code + sm.multiply(debug)
+        elif self.mode == Token.SLASH:
+            return code + sm.divide(debug)
+        else: # self.mode == Token.PERCENT
+            return code + sm.modulo(debug)
 
 
 class ExpUnary(Expression):
@@ -480,12 +445,20 @@ class ExpUnary(Expression):
             return f'{self.operand}'
 
     def evaluate(self):
-        if self.mode == '!':
+        if self.mode == Token.NOT:
             return int(not bool(self.operand.evaluate()))
-        elif self.mode == '-':
+        elif self.mode == Token.MINUS:
             return 256 - self.operand.evaluate()
-        else:  # +
+        else:  # self.mode == Token.PLUS
             return int(bool(self.operand.evaluate()))
+
+    def codegen(self, funcs, tables, debug):
+        if self.mode == Token.NOT:
+            return self.operand.codegen(sm, funcs, tables, debug) + sm.boolnot(debug)
+        elif self.mode == Token.MINUS:
+            return sm.load_constant(0, debug) + self.operand.codegen(sm, funcs, tables, debug) + sm.subtract(debug)
+        else:
+            return self.operand.codegen(sm, funcs, tables, debug)
 
 
 class Parser:
@@ -515,35 +488,23 @@ class Parser:
             return token
         return False
 
-    def parse_program(self, tables):
+    def parse_program(self):
         statements = []
         funcs = {}
-        lvars = {}
+        tables = [{}]
         while self.peek()['type'] != Token.EOF:
-            if self.peek()['type'] == Token.KW_VAR:
-                st = self.parse_init_variable(tables + [lvars])
-                lvars[st.name] = {'type': 'variable'}
-                statements += [st]
-            elif self.peek()['type'] == Token.KW_ARR:
-                st = self.parse_init_array(tables + [lvars])
-                lvars[st.name] = {'type': 'array', 'shape': st.shape}
-                statements += [st]
-            elif self.peek()['type'] == Token.KW_FN:
-                func = self.parse_function(tables + [lvars])
+            if self.peek()['type'] == Token.KW_FN:
+                func = self.parse_function(tables)
                 funcs[func.name] = func
             else:
-                raise SyntaxError(f'Unexpected token {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.')
-        if not funcs.get('main', None):
-            raise SyntaxError(f'The program must have a function named "main" as the starting point.')
-        main = funcs.pop('main')
-        if main.args != []:
-            raise SyntaxError(f'The main function must not have any arguments.')
-        return Program(statements, funcs, main)
+                statements += [self.parse_statement(tables, False)]
+        self.expect(Token.EOF)
+        return Program(statements, funcs)
 
     def parse_function(self, tables):
         self.expect(Token.KW_FN)
         if self.peek()['type'] != Token.ID:
-            raise SyntaxError(f'Expected {Token.ID}, got {repr(self.peek()["type"])} in line {token["line"] + 1}.')
+            raise SyntaxError(f'Expected {repr(Token.ID)}, got {repr(self.peek()["type"])} in line {token["line"] + 1}.')
         funcname = self.peek()['token']
         self.seek()
         self.expect(Token.LPAREN)
@@ -551,42 +512,21 @@ class Parser:
         args = []
         while self.peek()['type'] != Token.RPAREN:
             if self.peek()['type'] == Token.KW_VAR:
-                self.seek()
-                if self.peek()['type'] != Token.ID:
-                    raise SyntaxError(
-                        f'Expected {repr(Token.ID)}, got {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.'
-                    )
-                name = self.peek()['token']
-                if lvars.get(name, None):
-                    raise SyntaxError(
-                        f'Name "{name}" is already used in this context in line {self.peek()["line"] + 1}'
-                    )
-                self.seek()
-                args += [StInitVariable(name)]
-                lvars[name] = {'type': 'variable'}
-            else:  # elif self.peek()['type'] == Token.KW_ARR:
-                self.seek()
-                if self.peek()['type'] != Token.ID:
-                    raise SyntaxError(
-                        f'Expected {repr(Token.ID)}, got {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.'
-                    )
-                name = self.peek()['token']
-                if lvars.get(name, None):
-                    raise SyntaxError(
-                        f'Name "{name}" is already used in this contest in line {self.peek()["line"]} + 1'
-                    )
-                self.seek()
-                shape = []
-                while self.peek()['type'] == Token.LBRACK:
-                    self.expect(Token.LBRACK)
-                    shape += [self.parse_expression(tables)]
-                    self.expect(Token.RBRACK)
-                args += [StInitArray(name, shape)]
-                lvars[name] = {'type': 'array', 'shape': shape}
+                var = self.parse_init_variable(tables + [lvars], tail=None, enable_init=False)
+                lvars[var.name] = {'type': 'variable'}
+                args += [var]
+            elif self.peek()['type'] == Token.KW_ARR:
+                arr = self.parse_init_array(tables + [lvars], tail=None)
+                lvars[arr.name] = {'type': 'array', 'shape': arr.eval_shape()}
+                args += [arr]
+            else:
+                raise SyntaxError(f'Unexpected token {repr(Token.KW_VAR)} or {repr(Token.KW_ARR)}, got {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.')
             self.match(Token.COMMA)
         self.expect(Token.RPAREN)
         self.expect(Token.LBRACE)
-        body, _ = self.parse_statement_list(tables, lvars)
+        body = []
+        while self.peek()['type'] != Token.RBRACE:
+            body += [self.parse_statement(tables + [lvars], True)]
         self.expect(Token.RBRACE)
         return Function(funcname, args, body)
 
@@ -616,19 +556,19 @@ class Parser:
             self.expect(tail)
         return StAssign(lhs, mode, rhs)
 
-    def parse_for(self, tables):
+    def parse_for(self, tables, enable_return):
         self.expect(Token.KW_FOR)
         self.expect(Token.LPAREN)
         inits = []
         lvars = {}
         while self.peek()['type'] != Token.SEMICOLON:
             if self.peek()['type'] == Token.KW_VAR:
-                var = self.parse_init_variable(tables + [lvars], tail=None)
+                var = self.parse_init_variable(tables + [lvars], tail=None, enable_init=True)
                 lvars[var.name] = {'type': 'variable'}
                 inits += [var]
             elif self.peek()['type'] == Token.KW_ARR:
                 arr = self.parse_init_array(tables + [lvars], tail=None)
-                lvars[arr.name] = {'type': 'array', 'shape': arr.shape}
+                lvars[arr.name] = {'type': 'array', 'shape': arr.eval_shape()}
                 inits += [arr]
             else:
                 raise SyntaxError(f'Expected {repr(Token.KW_VAR)} or {repr(Token.ARR)}, got {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.')
@@ -641,74 +581,78 @@ class Parser:
             reinits += [self.parse_assignment(tables + [lvars], tail=None)]
         self.expect(Token.RPAREN)
         self.expect(Token.LBRACE)
-        body, _ = self.parse_statement_list(tables, lvars)
+        body = []
+        while self.peek()['type'] != Token.RBRACE:
+            body += [self.parse_statement(tables + [lvars])]
         self.expect(Token.RBRACE)
         return StFor(inits, cond, reinits, body)
 
-    def parse_while(self, tables):
+    def parse_while(self, tables, enable_return):
         self.expect(Token.KW_WHILE)
         cond = self.parse_expression(tables)
         self.expect(Token.LBRACE)
-        body, lvars = self.parse_statement_list(tables, {})
+        lvars = {}
+        body = []
+        while self.peek()['type'] != Token.RBRACE:
+            body += [self.parse_statement(tables + [lvars])]
         self.expect(Token.RBRACE)
         return StWhile(cond, body)
 
-    def parse_if(self, tables):
+    def parse_if(self, tables, enable_return):
         self.expect(Token.KW_IF)
         cond = self.parse_expression(tables)
         self.expect(Token.LBRACE)
-        body_then, lvars = self.parse_statement_list(tables, {})
+        body_then = []
+        lvars = {}
+        while self.peek()['type'] != Token.RBRACE:
+            body_then += [self.parse_statement(tables + [lvars], enable_return)]
         self.expect(Token.RBRACE)
         if self.peek()['type'] == Token.KW_ELSE:
             self.seek()
             self.expect(Token.LBRACE)
-            body_else, _ = self.parse_statement_list(tables, lvars)
+            body_else = []
+            while self.peek()['type'] != Token.RBRACE:
+                body_else += [self.parse_statement(tables + [lvars], enable_return)]
             self.expect(Token.RBRACE)
             return StIf(cond, body_then, body_else)
         else:
             return StIf(cond, body_then)
-
-    def parse_statement_list(self, tables, lvars):
-        statements = []
-        while self.peek()['type'] != Token.RBRACE:
-            if self.peek()['type'] == Token.KW_VAR:
-                st = self.parse_init_variable(tables + [lvars])
-                lvars[st.name] = {'type': 'variable'}
-                statements += [st]
-            elif self.peek()['type'] == Token.KW_ARR:
-                st = self.parse_init_array(tables + [lvars])
-                lvars[st.name] = {'type': 'array', 'shape': st.shape}
-                statements += [st]
-            elif self.peek()['type'] == Token.KW_IF:
-                statements += [self.parse_if(tables + [lvars])]
-            elif self.peek()['type'] == Token.KW_WHILE:
-                statements += [self.parse_while(tables + [lvars])]
-            elif self.peek()['type'] == Token.KW_FOR:
-                statements += [self.parse_for(tables + [lvars])]
-            elif self.peek()['type'] == Token.KW_RETURN:
-                statements += [self.parse_return(tables + [lvars])]
-            elif self.peek()['type'] == Token.ID:
-                self.seek()
-                if self.peek()['type'] == Token.LPAREN:
-                    self.unseek()
-                    token = self.peek()
-                    self.seek()
-                    self.expect(Token.LPAREN)
-                    args = []
-                    while self.peek()['type'] != Token.RPAREN:
-                        args += [self.parse_expression(tables + [lvars])]
-                        self.match(Token.COMMA)
-                    self.expect(Token.RPAREN)
-                    self.expect(Token.SEMICOLON)
-                    statements += [StCall(ExpCall(token['token'], args))]
-                else:
-                    self.unseek()
-                    statements += [self.parse_assignment(tables)]
+        
+    def parse_statement(self, tables, enable_return=False):
+        if self.peek()['type'] == Token.KW_VAR:
+            st = self.parse_init_variable(tables)
+            tables[-1][st.name] = {'type': 'variable'}
+            return st
+        elif self.peek()['type'] == Token.KW_ARR:
+            st = self.parse_init_array(tables)
+            tables[-1][st.name] = {'type':'array', 'shape': st.eval_shape()}
+            return st
+        elif self.peek()['type'] == Token.KW_IF:
+            return self.parse_if(tables, enable_return)
+        elif self.peek()['type'] == Token.KW_WHILE:
+            return self.parse_while(tables, enable_return)
+        elif self.peek()['type'] == Token.KW_FOR:
+            return self.parse_for(tables, enable_return)
+        elif self.peek()['type'] == Token.KW_RETURN:
+            if enable_return:
+                return self.parse_return(tables)
             else:
-                raise SyntaxError(f'Unexpected token {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.')
-        return StList(statements), lvars
+                raise SyntaxError(f'In this context, return is not available, in line {self.peek()["line"] + 1}.')
+        elif self.peek()['type'] == Token.ID:
+            self.seek()
+            if self.peek()['type'] == Token.LPAREN:
+                self.unseek()
+                expr = self.parse_expcall(tables)
+                self.expect(Token.SEMICOLON)
+                return StCall(expr)
+            else:
+                self.unseek()
+                return self.parse_assignment(tables)
+        else:
+            raise SyntaxError(f'Unexpected token {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.')
 
-    def parse_init_variable(self, tables, tail=Token.SEMICOLON):
+
+    def parse_init_variable(self, tables, tail=Token.SEMICOLON, enable_init=True):
         self.expect(Token.KW_VAR)
         if self.peek()['type'] == Token.ID:
             name = self.peek()['token']
@@ -716,8 +660,11 @@ class Parser:
                 raise SyntaxError(f'Name "{name}" is already used in this context in line {self.peek()["line"] + 1}.')
             self.seek()
             if self.peek()['type'] == Token.ASSIGN:
-                self.seek()
-                rhs = self.parse_expression(tables)
+                if enable_init:
+                    self.seek()
+                    rhs = self.parse_expression(tables)
+                else:
+                    raise SyntaxError(f'In this context, assign is not supported, in line {self.peek()["line"] + 1}.')
             else:
                 rhs = None
         else:
@@ -838,6 +785,20 @@ class Parser:
         else:
             return self.parse_primary_expression(tables)
 
+    def parse_expcall(self, tables):
+        if self.peek()['type'] != Token.ID:
+            raise SyntaxError(f'Expected {repr(Token.ID)}, got {repr(self.peek()["type"])} in line {token["line"] + 1}.')
+        token = self.peek()
+        self.seek()
+        self.expect(Token.LPAREN)
+        args = []
+        while self.peek()['type'] != Token.RPAREN:
+            args += [self.parse_expression(tables)]
+            self.match(Token.COMMA)
+        self.expect(Token.RPAREN)
+        return ExpCall(token['token'], args)
+
+
     def parse_primary_expression(self, tables):
         if self.peek()['type'] == Token.ID:
             token = self.peek()
@@ -856,13 +817,8 @@ class Parser:
                     self.expect(Token.RBRACK)
                 return ExpArrayElement(name, indices)
             elif self.peek()['type'] == Token.LPAREN:
-                self.seek()
-                args = []
-                while self.peek()['type'] != Token.RPAREN:
-                    args += [self.parse_expression(tables)]
-                    self.match(Token.COMMA)
-                self.expect(Token.RPAREN)
-                return ExpCall(token['token'], args)
+                self.unseek()
+                return self.parse_expcall(tables)
             else:
                 name = token['token']
                 var = next((table[name] for table in tables[::-1] if name in table), None)
@@ -896,6 +852,5 @@ if __name__ == '__main__':
     lex = LexicalAnalyzer(prog)
     lex.analyze()
     parser = Parser(lex)
-    tables = []
-    result = parser.parse_program(tables)
-    print(result.codegen())
+    result = parser.parse_program()
+    print(result.string(0))
