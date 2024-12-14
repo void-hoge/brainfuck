@@ -84,7 +84,7 @@ class StackMachine:
         assert 0 <= pos < self.dp
         rpos = pos - self.dp
         code = f'lv {pos}: ' if debug else ''
-        code += '>[-]<'
+        code += '[-]>[-]<'
         code += mvp(rpos)
         code += multi_dst_add([-rpos, -rpos + 1])
         code += mvp(-rpos + 1)
@@ -436,7 +436,7 @@ class StackMachine:
         assert len(shape) < self.dp
         assert pos <= self.dp
         rpos = pos - self.dp
-        code = f'mdl {pos} ({"".join(map(str, shape))}): ' if debug else ''
+        code = f'mdl {pos} ({" ".join(map(str, shape))}): ' if debug else ''
         for s in shape:
             code += '<'
             code += multi_dst_add([rpos - 1])
