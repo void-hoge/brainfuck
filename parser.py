@@ -54,6 +54,11 @@ class Function:
         code += f'{indent(level)}}}'
         return code
 
+    def extract_calls(self, index, calls):
+        for st in self.body:
+            index = st.extract_calls(index, calls)
+        return index
+
 
 class Statement:
     pass
@@ -113,6 +118,9 @@ class StAssign(Statement):
             code += sm.multi_dim_store(var['pos'], var['shape'], debug)
         return code
 
+    def extract_calls(self, index, calls):
+        return self.rhs.extract_calls(index, calls)
+
 
 class StReturn(Statement):
     def __init__(self, expr):
@@ -150,6 +158,12 @@ class StWhile(Statement):
         code += sm.end_while(debug)
         code += sm.pop(size, debug)
         return code
+
+    def extract_calls(self, index, calls):
+        index = self.cond.extract_calls(index, calls)
+        for st in self.body:
+            index = st.extract_calls(index, calls)
+        return index
 
 
 class StIf(Statement):
@@ -194,6 +208,12 @@ class StIf(Statement):
         code += sm.pop(size, debug)
         return code
 
+    def extract_calls(self, index, calls):
+        index = self.cond.extract_calls(index, calls)
+        for st in self.body_then:
+            index = st.extract_calls(index, calls)
+        return index
+
 
 class StFor(Statement):
     def __init__(self, inits, cond, reinits, body):
@@ -236,6 +256,16 @@ class StFor(Statement):
         code += sm.end_while(debug)
         code += sm.pop(size, debug)
         return code
+
+    def extract_calls(self, index, calls):
+        for init in self.inits:
+            index = init.extract_calls(index, calls)
+        index = self.cond.extract_calls(index, calls)
+        for st in self.body:
+            index = st.extract_calls(index, calls)
+        for init in self.reinits:
+            index = st.extract_calls(index, calls)
+        return index
 
 
 class StCall(Statement):
@@ -303,6 +333,9 @@ class StCall(Statement):
             code += sm.pop(sm.dp - base, debug)
             return code
 
+    def extract_calls(self, index, calls):
+        return self.expr.extract_calls(index, calls)
+
 
 class StInitVariable(Statement):
     def __init__(self, name, rhs=None):
@@ -336,6 +369,12 @@ class StInitVariable(Statement):
         else:
             code += sm.load_constant(0, debug)
         return code
+
+    def extract_calls(self, index, calls):
+        if self.rhs:
+            return self.rhs.extract_calls(index, calls)
+        else:
+            return index
 
 
 class StInitArray(Statement):
@@ -378,6 +417,9 @@ class StInitArray(Statement):
         code = sm.push_multi_dim_array(self.eval_shape(), debug)
         tables[-1][self.name] = {'type': 'array', 'pos': sm.dp, 'size': self.totalsize(), 'shape': self.eval_shape()}
         return code
+
+    def extract_calls(self, index, calls):
+        return index
 
 
 class Expression:
@@ -432,8 +474,12 @@ class ExpCall(Expression):
         else:
             return NotImplemented
 
-    def extract_calls(self, calls):
-        pass
+    def extract_calls(self, index, calls):
+        for arg in self.args:
+            index = arg.extract_calls(index, calls)
+        if self.name not in ['putchar', 'putint']:
+            calls += [{'name': self.name, 'index': index}]
+        return index + 1
 
 
 class ExpArrayElement(Expression):
@@ -457,6 +503,11 @@ class ExpArrayElement(Expression):
         code += sm.multi_dim_load(arr['pos'], arr['shape'], debug)
         return code
 
+    def extract_calls(self, index, calls):
+        for idx in self.indices:
+            index = idx.extract_calls(index, calls)
+        return index
+
 
 class ExpVariable(Expression):
     def __init__(self, name):
@@ -470,6 +521,9 @@ class ExpVariable(Expression):
         assert var
         assert var['type'] == 'variable'
         return sm.load_variable(var['pos'], debug)
+
+    def extract_calls(self, index, calls):
+        return index
 
 
 class ExpInteger(Expression):
@@ -485,6 +539,9 @@ class ExpInteger(Expression):
     def codegen(self, sm, funcs, tables, debug):
         return sm.load_constant(self.value, debug)
 
+    def extract_calls(self, index, calls):
+        return index
+
 
 class ExpCharacter(Expression):
     def __init__(self, value):
@@ -498,6 +555,9 @@ class ExpCharacter(Expression):
 
     def codegen(self, sm, funcs, tables, debug):
         return sm.load_constant(self.value, debug)
+
+    def extract_calls(self, index, calls):
+        return index
 
 
 class ExpLogicalOr(Expression):
@@ -517,6 +577,11 @@ class ExpLogicalOr(Expression):
         code += self.right.codegen(sm, funcs, tables, debug)
         return code + sm.boolor(debug)
 
+    def extract_calls(self, index, calls):
+        index = self.left.extract_calls(index, calls)
+        index = self.right.extract_calls(index, calls)
+        return index
+
 
 class ExpLogicalAnd(Expression):
     def __init__(self, left, right):
@@ -534,6 +599,11 @@ class ExpLogicalAnd(Expression):
         code += self.left.codegen(sm, funcs, tables, debug)
         code += self.right.codegen(sm, funcs, tables, debug)
         return code + sm.booland(debug)
+
+    def extract_calls(self, index, calls):
+        index = self.left.extract_calls(index, calls)
+        index = self.right.extract_calls(index, calls)
+        return index
 
 
 class ExpEquality(Expression):
@@ -565,6 +635,11 @@ class ExpEquality(Expression):
             return code + sm.equal(debug)
         else:
             return code + sm.notequal(debug)
+
+    def extract_calls(self, index, calls):
+        index = self.left.extract_calls(index, calls)
+        index = self.right.extract_calls(index, calls)
+        return index
 
 
 class ExpRelational(Expression):
@@ -607,6 +682,11 @@ class ExpRelational(Expression):
         else:  # self.mode == Token.GE:
             return code + sm.greater_or_equal(debug)
 
+    def extract_calls(self, index, calls):
+        index = self.left.extract_calls(index, calls)
+        index = self.right.extract_calls(index, calls)
+        return index
+
 
 class ExpAdditive(Expression):
     def __init__(self, mode, left, right):
@@ -637,6 +717,11 @@ class ExpAdditive(Expression):
             return code + sm.add(debug)
         else:  # self.mode == Token.MINUS
             return code + sm.subtract(debug)
+
+    def extract_calls(self, index, calls):
+        index = self.left.extract_calls(index, calls)
+        index = self.right.extract_calls(index, calls)
+        return index
 
 
 class ExpMultiplicative(Expression):
@@ -674,6 +759,11 @@ class ExpMultiplicative(Expression):
         else:  # self.mode == Token.PERCENT
             return code + sm.modulo(debug)
 
+    def extract_calls(self, index, calls):
+        index = self.left.extract_calls(index, calls)
+        index = self.right.extract_calls(index, calls)
+        return index
+
 
 class ExpUnary(Expression):
     def __init__(self, mode, operand):
@@ -703,6 +793,9 @@ class ExpUnary(Expression):
             return sm.load_constant(0, debug) + self.operand.codegen(sm, funcs, tables, debug) + sm.subtract(debug)
         else:
             return self.operand.codegen(sm, funcs, tables, debug)
+
+    def extract_calls(self, index, calls):
+        return self.operand.extract_calls(index, calls)
 
 
 class Parser:
