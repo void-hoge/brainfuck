@@ -121,6 +121,9 @@ class StAssign(Statement):
     def extract_calls(self, index, calls):
         return self.rhs.extract_calls(index, calls)
 
+    def needs_expansion(self):
+        return self.rhs.needs_expansion()
+
 
 class StReturn(Statement):
     def __init__(self, expr):
@@ -128,6 +131,12 @@ class StReturn(Statement):
 
     def string(self, level):
         return f'{indent(level)}return {self.expr};'
+
+    def extract_calls(self, index, calls):
+        return self.rhs.extract_calls(index, calls)
+
+    def needs_expansion(self):
+        return True
 
 
 class StWhile(Statement):
@@ -164,6 +173,14 @@ class StWhile(Statement):
         for st in self.body:
             index = st.extract_calls(index, calls)
         return index
+
+    def needs_expansion(self):
+        if self.cond.needs_expansion():
+            return True
+        for st in self.body:
+            if st.needs_expansion():
+                return True
+        return False
 
 
 class StIf(Statement):
@@ -213,6 +230,14 @@ class StIf(Statement):
         for st in self.body_then:
             index = st.extract_calls(index, calls)
         return index
+
+    def needs_expansion(self):
+        if self.cond.needs_expansion():
+            return True
+        for st in self.body:
+            if st.needs_expansion():
+                return True
+        return False
 
 
 class StFor(Statement):
@@ -266,6 +291,19 @@ class StFor(Statement):
         for init in self.reinits:
             index = st.extract_calls(index, calls)
         return index
+
+    def needs_expansion(self):
+        for init in self.inits:
+            if init.needs_expansion():
+                return True
+        if self.cond.needs_expansion():
+            return True
+        for st in self.body:
+            if st.needs_expansion():
+                return True
+        for init in self.reinits:
+            if init.needs_expansion():
+                return True
 
 
 class StCall(Statement):
@@ -336,6 +374,11 @@ class StCall(Statement):
     def extract_calls(self, index, calls):
         return self.expr.extract_calls(index, calls)
 
+    def needs_expansion(self):
+        if self.expr.name in ['putchar', 'putint']:
+            return False
+        return self.expr.needs_expansion()
+
 
 class StInitVariable(Statement):
     def __init__(self, name, rhs=None):
@@ -375,6 +418,12 @@ class StInitVariable(Statement):
             return self.rhs.extract_calls(index, calls)
         else:
             return index
+
+    def needs_expansion(self):
+        if self.rhs:
+            if self.rhs.needs_expansion():
+                return True
+        return False
 
 
 class StInitArray(Statement):
@@ -420,6 +469,9 @@ class StInitArray(Statement):
 
     def extract_calls(self, index, calls):
         return index
+
+    def needs_expansion(self):
+        return False
 
 
 class Expression:
@@ -472,14 +524,23 @@ class ExpCall(Expression):
         elif self.name == 'getint':
             return self.builtin_getint(sm, funcs, tables, debug)
         else:
-            return NotImplemented
+            if self.name not in self.funcs:
+                return NotImplemented
+            else:
+                raise SyntaxError(f'Undefined function named {self.name}.')
 
     def extract_calls(self, index, calls):
         for arg in self.args:
             index = arg.extract_calls(index, calls)
         if self.name not in ['putchar', 'putint']:
+            self.index = index
             calls += [{'name': self.name, 'index': index}]
         return index + 1
+
+    def needs_expansion(self):
+        if self.name in ['putchar', 'putint']:
+            return False
+        return True
 
 
 class ExpArrayElement(Expression):
@@ -508,6 +569,12 @@ class ExpArrayElement(Expression):
             index = idx.extract_calls(index, calls)
         return index
 
+    def needs_expansion(self):
+        for idx in self.indices:
+            if idx.needs_expansion():
+                return True
+        return False
+
 
 class ExpVariable(Expression):
     def __init__(self, name):
@@ -524,6 +591,9 @@ class ExpVariable(Expression):
 
     def extract_calls(self, index, calls):
         return index
+
+    def needs_expansion(self):
+        return False
 
 
 class ExpInteger(Expression):
@@ -542,6 +612,9 @@ class ExpInteger(Expression):
     def extract_calls(self, index, calls):
         return index
 
+    def needs_expansion(self):
+        return False
+
 
 class ExpCharacter(Expression):
     def __init__(self, value):
@@ -558,6 +631,9 @@ class ExpCharacter(Expression):
 
     def extract_calls(self, index, calls):
         return index
+
+    def needs_expansion(self):
+        return False
 
 
 class ExpLogicalOr(Expression):
@@ -582,6 +658,9 @@ class ExpLogicalOr(Expression):
         index = self.right.extract_calls(index, calls)
         return index
 
+    def needs_expansion(self):
+        return self.left.needs_expansion() or self.right.needs_expansion()
+
 
 class ExpLogicalAnd(Expression):
     def __init__(self, left, right):
@@ -604,6 +683,9 @@ class ExpLogicalAnd(Expression):
         index = self.left.extract_calls(index, calls)
         index = self.right.extract_calls(index, calls)
         return index
+
+    def needs_expansion(self):
+        return self.left.needs_expansion() or self.right.needs_expansion()
 
 
 class ExpEquality(Expression):
@@ -640,6 +722,9 @@ class ExpEquality(Expression):
         index = self.left.extract_calls(index, calls)
         index = self.right.extract_calls(index, calls)
         return index
+
+    def needs_expansion(self):
+        return self.left.needs_expansion() or self.right.needs_expansion()
 
 
 class ExpRelational(Expression):
@@ -687,6 +772,9 @@ class ExpRelational(Expression):
         index = self.right.extract_calls(index, calls)
         return index
 
+    def needs_expansion(self):
+        return self.left.needs_expansion() or self.right.needs_expansion()
+
 
 class ExpAdditive(Expression):
     def __init__(self, mode, left, right):
@@ -722,6 +810,9 @@ class ExpAdditive(Expression):
         index = self.left.extract_calls(index, calls)
         index = self.right.extract_calls(index, calls)
         return index
+
+    def needs_expansion(self):
+        return self.left.needs_expansion() or self.right.needs_expansion()
 
 
 class ExpMultiplicative(Expression):
@@ -764,6 +855,9 @@ class ExpMultiplicative(Expression):
         index = self.right.extract_calls(index, calls)
         return index
 
+    def needs_expansion(self):
+        return self.left.needs_expansion() or self.right.needs_expansion()
+
 
 class ExpUnary(Expression):
     def __init__(self, mode, operand):
@@ -797,6 +891,8 @@ class ExpUnary(Expression):
     def extract_calls(self, index, calls):
         return self.operand.extract_calls(index, calls)
 
+    def needs_expansion(self):
+        return self.operand.needs_expansion()
 
 class Parser:
     def __init__(self, lex):
