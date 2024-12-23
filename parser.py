@@ -5,6 +5,8 @@ from enum import IntEnum, auto
 from lexer import Token, LexicalAnalyzer
 from stack_machine import *
 
+STKBYTES = 2
+STKPTRBYTES = STKBYTES - 1
 
 def indent(level):
     return '    ' * level
@@ -22,6 +24,9 @@ class Program:
         for statement in self.statements:
             code += statement.string(level) + '\n'
         return code
+
+    def __str__(self):
+        return self.string(0)
 
     def codegen(self, debug):
         tables = [{}]
@@ -54,9 +59,118 @@ class Function:
         code += f'{indent(level)}}}'
         return code
 
+    def push_frame_stack(self, sm, debug):
+        code = ''
+        for i in range(STKBYTES)[::-1]:
+            code += sm.load_variable(self.frameptr_pos + i, debug)
+        code += sm.multi_dim_store(self.frame_stack_pos, self.frame_stack_shape, debug)
+        for i in range(STKBYTES):
+            code += sm.load_variable(self.frameptr_pos + i, debug)
+        code += sm.load_hex(STKBYTES, 1, debug)
+        code += sm.add_hex(STKBYTES, debug)
+        for i in range(STKBYTES)[::-1]:
+            code += sm.store_variable(self.frameptr_pos + i, debug)
+        return code
+
+    def pop_frame_stack(self, sm, debug):
+        code = ''
+        for i in range(STKBYTES):
+            code += sm.load_variable(self.frameptr_pos + i, debug)
+        code += sm.load_hex(STKBYTES, 1, debug)
+        code += sm.subtract_hex(STKBYTES, debug)
+        for i in range(STKBYTES)[::-1]:
+            code += sm.store_variable(self.frameptr_pos + i, debug)
+        for i in range(STKBYTES)[::-1]:
+            code += sm.load_variable(self.frameptr_pos + i, debug)
+        code += sm.multi_dim_load(self.frame_stack_pos, self.frame_stack_shape, debug)
+        return code
+
+    def init_callenv(self, sm, funcs, debug):
+        calls = []
+        self.extract_calls(0, calls)
+        self.funcset = {call['num'] for call in calls} | {self.name}
+        self.num_states = sum(funcs[name].count_states(1) for name in self.funcset)
+        code = ''
+        # allocate return
+        code += 'return pos\n'
+        self.return_pos = sm.dp
+        code += sm.load_constant(0, debug)
+        # allocate frame stack
+        code += 'frame stack\n'
+        self.frame_stack_shape = [16] * STKBYTES
+        code += sm.push_multi_dim_array(self.frame_stack_shape, debug)
+        self.frame_stack_pos = sm.dp
+        # allocate state variable stack
+        code += 'state var stack\n'
+        self.state_stack_shape = [16] * STKPTRBYTES + [self.num_states.bit_length()]
+        code += sm.push_multi_dim_array(self.state_stack_shape, debug)
+        self.state_stack_pos = sm.dp
+        # allocate frame pointer (ptr of the frame stack)
+        code += 'frame ptr\n'
+        self.frameptr_pos = sm.dp
+        for _ in range(STKBYTES):
+            code += sm.load_constant(0, debug)
+        # allocate state variable
+        code += 'state var\n'
+        self.state_pos = sm.dp
+        for _ in range(self.num_states.bit_length()):
+            code += sm.load_constant(0, debug)
+        # allocate stack pointer (recursion depth or ptr of the state variable stack)
+        code += 'stack ptr\n'
+        self.stackptr_pos = sm.dp
+        for _ in range(STKPTRBYTES):
+            code += sm.load_constant(0, debug)
+        return code
+
+    def codegen(self, sm, funcs, tables, args, debug):
+        if len(args) != len(self.args):
+            raise SyntaxError(f'The function {repr(self.name)} must take just {len(self.args)} arguments, but entered {len(args)}.')
+        code = self.init_callenv(sm, funcs, debug)
+        # load args
+        base = sm.dp
+        code += 'load args\n'
+        for arg, argv in zip(self.args, args):
+            code += StInitVariable(arg.name, argv).allocate(sm, funcs, tables + [{}], debug)
+        # push args into the frame stack
+        code += 'push args into the frame stack\n'
+        for _ in self.args:
+            code += self.push_frame_stack(sm, debug)
+        # begin main loop
+        code += 'begin main loop\n'
+        code += sm.load_constant(1, debug)
+        code += sm.begin_while(debug)
+
+        for _ in range(self.num_states.bit_length()):
+            sm.load_constant(0)
+        sm.pop(self.num_states.bit_length())
+
+        code += 'cond\n'
+        for i, ch in enumerate(f'{self.num_states:b}'):
+            for _ in range(STKPTRBYTES):
+                code += sm.load_constant(0, debug)
+            code += sm.load_constant(i, debug)
+            code += sm.multi_dim_load(self.state_stack_pos, self.state_stack_shape, debug)
+            code += sm.load_constant(int(ch), debug)
+            code += sm.notequal(debug)
+        for _ in range(self.num_states.bit_length() - 1):
+            code += sm.boolor(debug)
+        code += sm.end_while(debug)
+        code += 'end main loop\n'
+
+        code += 'clean\n'
+        code += sm.pop(sm.dp - self.return_pos - 1, debug)
+        return code
+
     def extract_calls(self, index, calls):
         for st in self.body:
             index = st.extract_calls(index, calls)
+        return index
+
+    def count_states(self, index):
+        for st in self.body:
+            index = st.count_states(index)
+            if isinstance(st, StReturn):
+                break
         return index
 
 
@@ -89,7 +203,7 @@ class StAssign(Statement):
         var = next((table[self.lhs.name] for table in tables[::-1] if self.lhs.name in table), None)
         assert var
         opcode = {
-            Token.ASSIGN: lambda x: '',
+            Token.ASSIGN: lambda _: '',
             Token.ADDASSIGN: sm.add,
             Token.SUBASSIGN: sm.subtract,
             Token.MULASSIGN: sm.multiply,
@@ -124,6 +238,9 @@ class StAssign(Statement):
     def needs_expansion(self):
         return self.rhs.needs_expansion()
 
+    def count_states(self, index):
+        return self.rhs.count_states(index)
+
 
 class StReturn(Statement):
     def __init__(self, expr):
@@ -133,10 +250,13 @@ class StReturn(Statement):
         return f'{indent(level)}return {self.expr};'
 
     def extract_calls(self, index, calls):
-        return self.rhs.extract_calls(index, calls)
+        return self.expr.extract_calls(index, calls)
 
     def needs_expansion(self):
         return True
+
+    def count_states(self, index):
+        return self.expr.count_states(index)
 
 
 class StWhile(Statement):
@@ -182,9 +302,21 @@ class StWhile(Statement):
                 return True
         return False
 
+    def count_states(self, index):
+        if self.needs_expansion():
+            index += 1
+            index = self.cond.count_states(index)
+            for st in self.body:
+                index = st.count_states(index)
+                if isinstance(st, StReturn):
+                    break
+            return index + 1
+        else:
+            return index
+
 
 class StIf(Statement):
-    def __init__(self, cond, body_then, body_else=False):
+    def __init__(self, cond, body_then, body_else=[]):
         self.cond = cond
         self.body_then = body_then
         self.body_else = body_else
@@ -194,11 +326,10 @@ class StIf(Statement):
         for st in self.body_then:
             code += st.string(level + 1) + '\n'
         code += f'{indent(level)}}}'
-        if self.body_else:
-            code += f'else {{\n'
-            for st in self.body_else:
-                code += st.string(level + 1) + '\n'
-            code += f'{indent(level)}}}'
+        code += f'else {{\n'
+        for st in self.body_else:
+            code += st.string(level + 1) + '\n'
+        code += f'{indent(level)}}}'
         return code
 
     def codegen(self, sm, funcs, tables, debug):
@@ -208,19 +339,17 @@ class StIf(Statement):
         for st in self.body_then:
             if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
                 code += st.allocate(sm, funcs, tables + [lvars], debug)
-        if self.body_else:
-            for st in self.body_else:
-                if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
-                    code += st.allocate(sm, funcs, tables + [lvars], debug)
+        for st in self.body_else:
+            if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
+                code += st.allocate(sm, funcs, tables + [lvars], debug)
         size = sm.dp - base
         code += self.cond.codegen(sm, funcs, tables + [lvars], debug)
         code += sm.begin_if(debug)
         for st in self.body_then:
             code += st.codegen(sm, funcs, tables + [lvars], debug)
         code += sm.begin_else(debug)
-        if self.body_else:
-            for st in self.body_else:
-                code += st.codegen(sm, funcs, tables + [lvars], debug)
+        for st in self.body_else:
+            code += st.codegen(sm, funcs, tables + [lvars], debug)
         code += sm.end_if(debug)
         code += sm.pop(size, debug)
         return code
@@ -234,10 +363,26 @@ class StIf(Statement):
     def needs_expansion(self):
         if self.cond.needs_expansion():
             return True
-        for st in self.body:
+        for st in self.body_then:
             if st.needs_expansion():
                 return True
         return False
+
+    def count_states(self, index):
+        if self.needs_expansion():
+            index = self.cond.count_states(index)
+            for st in self.body_then:
+                index = st.count_states(index)
+                if isinstance(st, StReturn):
+                    break
+            index += 1
+            for st in self.body_else:
+                index = st.count_states(index)
+                if isinstance(st, StReturn):
+                    break
+            return index
+        else:
+            return index
 
 
 class StFor(Statement):
@@ -305,6 +450,22 @@ class StFor(Statement):
             if init.needs_expansion():
                 return True
 
+    def count_states(self, index):
+        if self.needs_expansion():
+            for init in self.inits:
+                index = init.count_states(index)
+            index += 1
+            index = self.cond.count_states(index)
+            for st in self.body:
+                index = st.count_states(index)
+                if isinstance(st, StReturn):
+                    break
+            for init in self.reinits:
+                index = init.count_states(index)
+            return index + 1
+        else:
+            return index
+
 
 class StCall(Statement):
     def __init__(self, expr):
@@ -314,17 +475,11 @@ class StCall(Statement):
         return f'{indent(level)}{self.expr};'
 
     def builtin_putchar(self, sm, funcs, tables, debug):
-        if len(self.expr.args) != 1:
-            raise SyntaxError(f'Number of arguments of the built-in putchar is 1.')
-        code = self.expr.args[0].codegen(sm, funcs, tables, debug)
-        code += sm.put_character(debug)
-        return code
+        return sm.put_character(debug)
 
     def builtin_putint(self, sm, funcs, tables, debug):
-        if len(self.expr.args) != 1:
-            raise SyntaxError(f'Number of arguments of the built-in putchar is 1.')
-        pos = sm.dp
-        code = self.expr.args[0].codegen(sm, funcs, tables, debug)
+        code = ''
+        pos = sm.dp - 1
         code += sm.load_variable(pos, debug)
         code += sm.load_constant(100, debug)
         code += sm.greater_or_equal(debug)
@@ -361,10 +516,14 @@ class StCall(Statement):
         return code
 
     def codegen(self, sm, funcs, tables, debug):
-        if self.expr.name == 'putchar':
-            return self.builtin_putchar(sm, funcs, tables, debug)
-        elif self.expr.name == 'putint':
-            return self.builtin_putint(sm, funcs, tables, debug)
+        if self.expr.name in ['putchar', 'putint']:
+            if len(self.expr.args) != 1:
+                raise SyntaxError(f'Number of arguments of the built-in putchar and putint is 1.')
+            code = self.expr.args[0].codegen(sm, funcs, tables, debug)
+            if self.expr.name == 'putchar':
+                return code + self.builtin_putchar(sm, funcs, tables, debug)
+            else:
+                return code + self.builtin_putint(sm, funcs, tables, debug)
         else:
             base = sm.dp
             code = self.expr.codegen(sm, funcs, tables, debug)
@@ -372,12 +531,20 @@ class StCall(Statement):
             return code
 
     def extract_calls(self, index, calls):
+        for arg in self.expr.args:
+            index = arg.extract_calls(index, calls)
         return self.expr.extract_calls(index, calls)
 
     def needs_expansion(self):
         if self.expr.name in ['putchar', 'putint']:
-            return False
+            if self.expr.args[0].needs_expansion():
+                return True
+            else:
+                return False
         return self.expr.needs_expansion()
+
+    def count_states(self, index):
+        return self.expr.count_states(index)
 
 
 class StInitVariable(Statement):
@@ -424,6 +591,12 @@ class StInitVariable(Statement):
             if self.rhs.needs_expansion():
                 return True
         return False
+
+    def count_states(self, index):
+        if self.rhs:
+            return self.rhs.count_states(index)
+        else:
+            return index
 
 
 class StInitArray(Statement):
@@ -472,6 +645,9 @@ class StInitArray(Statement):
 
     def needs_expansion(self):
         return False
+
+    def count_states(self, index):
+        return index
 
 
 class Expression:
@@ -524,23 +700,33 @@ class ExpCall(Expression):
         elif self.name == 'getint':
             return self.builtin_getint(sm, funcs, tables, debug)
         else:
-            if self.name not in self.funcs:
-                return NotImplemented
+            if self.name in funcs:
+                return funcs[self.name].codegen(sm, funcs, tables, self.args, debug)
             else:
                 raise SyntaxError(f'Undefined function named {self.name}.')
 
     def extract_calls(self, index, calls):
         for arg in self.args:
             index = arg.extract_calls(index, calls)
-        if self.name not in ['putchar', 'putint']:
+        if self.name not in ['putchar', 'putint', 'getchar', 'getint']:
             self.index = index
             calls += [{'name': self.name, 'index': index}]
         return index + 1
 
     def needs_expansion(self):
-        if self.name in ['putchar', 'putint']:
+        if any(arg.needs_expansion() for arg in self.args):
+            return True
+        if self.name in ['putchar', 'putint', 'getchar', 'getint']:
             return False
         return True
+
+    def count_states(self, index):
+        for arg in self.args:
+            index = arg.count_states(index)
+        if self.name in ['putchar', 'putint', 'getchar', 'getint']:
+            return index
+        else:
+            return index + 1
 
 
 class ExpArrayElement(Expression):
@@ -575,6 +761,11 @@ class ExpArrayElement(Expression):
                 return True
         return False
 
+    def count_states(self, index):
+        for idx in self.indices:
+            index = idx.count_states(index)
+        return index
+
 
 class ExpVariable(Expression):
     def __init__(self, name):
@@ -594,6 +785,9 @@ class ExpVariable(Expression):
 
     def needs_expansion(self):
         return False
+
+    def count_states(self, index):
+        return index
 
 
 class ExpInteger(Expression):
@@ -615,6 +809,8 @@ class ExpInteger(Expression):
     def needs_expansion(self):
         return False
 
+    def count_states(self, index):
+        return index
 
 class ExpCharacter(Expression):
     def __init__(self, value):
@@ -634,6 +830,9 @@ class ExpCharacter(Expression):
 
     def needs_expansion(self):
         return False
+
+    def count_states(self, index):
+        return index
 
 
 class ExpLogicalOr(Expression):
@@ -661,6 +860,10 @@ class ExpLogicalOr(Expression):
     def needs_expansion(self):
         return self.left.needs_expansion() or self.right.needs_expansion()
 
+    def count_states(self, index):
+        index = self.left.count_states(index)
+        return self.right.count_states(index)
+
 
 class ExpLogicalAnd(Expression):
     def __init__(self, left, right):
@@ -686,6 +889,10 @@ class ExpLogicalAnd(Expression):
 
     def needs_expansion(self):
         return self.left.needs_expansion() or self.right.needs_expansion()
+
+    def count_states(self, index):
+        index = self.left.count_states(index)
+        return self.right.count_states(index)
 
 
 class ExpEquality(Expression):
@@ -725,6 +932,10 @@ class ExpEquality(Expression):
 
     def needs_expansion(self):
         return self.left.needs_expansion() or self.right.needs_expansion()
+
+    def count_states(self, index):
+        index = self.left.count_states(index)
+        return self.right.count_states(index)
 
 
 class ExpRelational(Expression):
@@ -775,6 +986,10 @@ class ExpRelational(Expression):
     def needs_expansion(self):
         return self.left.needs_expansion() or self.right.needs_expansion()
 
+    def count_states(self, index):
+        index = self.left.count_states(index)
+        return self.right.count_states(index)
+
 
 class ExpAdditive(Expression):
     def __init__(self, mode, left, right):
@@ -813,6 +1028,10 @@ class ExpAdditive(Expression):
 
     def needs_expansion(self):
         return self.left.needs_expansion() or self.right.needs_expansion()
+
+    def count_states(self, index):
+        index = self.left.count_states(index)
+        return self.right.count_states(index)
 
 
 class ExpMultiplicative(Expression):
@@ -858,6 +1077,9 @@ class ExpMultiplicative(Expression):
     def needs_expansion(self):
         return self.left.needs_expansion() or self.right.needs_expansion()
 
+    def count_states(self, index):
+        index = self.left.count_states(index)
+        return self.right.count_states(index)
 
 class ExpUnary(Expression):
     def __init__(self, mode, operand):
@@ -893,6 +1115,9 @@ class ExpUnary(Expression):
 
     def needs_expansion(self):
         return self.operand.needs_expansion()
+
+    def count_states(self, index):
+        return self.operand.count_states(index)
 
 class Parser:
     def __init__(self, lex):
@@ -960,6 +1185,8 @@ class Parser:
         body = []
         while self.peek()['type'] != Token.RBRACE:
             body += [self.parse_statement(tables + [lvars], True)]
+        if not body or not isinstance(body[-1], StReturn):
+            body += [StReturn(ExpInteger(0))]
         self.expect(Token.RBRACE)
         return Function(funcname, args, body)
 

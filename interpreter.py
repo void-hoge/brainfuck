@@ -68,3 +68,4 @@ def interpreter(rawprog, ist=sys.stdin, ost=sys.stdout, dump=False):
 if __name__ == '__main__':
     with open(sys.argv[1]) as f:
         print(interpreter(rawprog=f.read()))
+            

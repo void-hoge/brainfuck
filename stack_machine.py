@@ -377,7 +377,7 @@ class StackMachine:
         return code + '\n' if debug else code
 
     def pop(self, amount, debug=False):
-        assert 0 < self.dp
+        assert 0 <= self.dp
         assert 0 <= amount
         code = f'pop {sanitize(amount)}: ' if debug else ''
         code += '<[-]' * amount
@@ -429,7 +429,7 @@ class StackMachine:
                 code += self.load_constant(0, False)
 
         initialize(shape, 0)
-        return code + '\n ' if debug else code
+        return code + '\n' if debug else code
 
     def multi_dim_load(self, pos, shape, debug=False):
         assert 0 < pos
@@ -534,6 +534,7 @@ class StackMachine:
         return code + '\n' if debug else code
 
     def load_hex(self, length, num, debug=False):
+        # load num as hexadecimal (big-endian)
         assert 0 <= num
         assert 0 < length
         code = f'loadhex {length} {num}: ' if debug else ''
