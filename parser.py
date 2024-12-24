@@ -60,7 +60,8 @@ class Function:
         return code
 
     def push_frame_stack(self, sm, debug):
-        code = ''
+        code = 'push_frame_stack\n'
+        begin = sm.dp
         for i in range(STKBYTES)[::-1]:
             code += sm.load_variable(self.frameptr_pos + i, debug)
         code += sm.multi_dim_store(self.frame_stack_pos, self.frame_stack_shape, debug)
@@ -70,10 +71,12 @@ class Function:
         code += sm.add_hex(STKBYTES, debug)
         for i in range(STKBYTES)[::-1]:
             code += sm.store_variable(self.frameptr_pos + i, debug)
+        print(f'push frame stack {begin} {sm.dp}')
         return code
 
     def pop_frame_stack(self, sm, debug):
-        code = ''
+        code = 'pop_frame_stack\n'
+        begin = sm.dp
         for i in range(STKBYTES):
             code += sm.load_variable(self.frameptr_pos + i, debug)
         code += sm.load_hex(STKBYTES, 1, debug)
@@ -83,13 +86,48 @@ class Function:
         for i in range(STKBYTES)[::-1]:
             code += sm.load_variable(self.frameptr_pos + i, debug)
         code += sm.multi_dim_load(self.frame_stack_pos, self.frame_stack_shape, debug)
+        print(f'pop frame stack {begin} {sm.dp}')
+        return code
+
+    def pop_state_stack(self, sm, debug):
+        '''
+        状態スタックの状態スタックポインタ番目に停止状態を代入
+        状態スタックポインタをデクリメント
+        状態スタックの状態スタックポインタ番目を読んで、状態変数に代入
+        '''
+        code = 'pop_state_stack\n'
+        begin = sm.dp
+        finish = [int(ch) for ch in f'{self.num_states:b}'][::-1]
+        for i, num in enumerate(finish):
+            code += sm.load_constant(num, debug)
+            code += sm.load_constant(i, debug)
+            for j in range(STKPTRBYTES)[::-1]:
+                code += sm.load_variable(self.stackptr_pos + j, debug)
+            code += sm.multi_dim_store(self.state_stack_pos, self.state_stack_shape, debug)
+
+        for i in range(STKPTRBYTES):
+            code += sm.load_variable(self.stackptr_pos + i, debug)
+        code += sm.load_hex(STKPTRBYTES, 1, debug)
+        code += sm.subtract_hex(STKPTRBYTES, debug)
+        for i in range(STKPTRBYTES)[::-1]:
+            code += sm.store_variable(self.stackptr_pos + i, debug)
+
+        for i in range(self.num_states.bit_length())[::-1]:
+            code += sm.load_constant(i, debug)
+            for j in range(STKPTRBYTES)[::-1]:
+                code += sm.load_variable(self.stackptr_pos + j, debug)
+            code += sm.multi_dim_load(self.state_stack_pos, self.state_stack_shape, debug)
+        for i in range(self.num_states.bit_length()):
+            code += sm.store_variable(self.state_pos + i, debug)
+        print(f'pop state stack {begin} {sm.dp}')
         return code
 
     def init_callenv(self, sm, funcs, debug):
         calls = []
         self.extract_calls(0, calls)
         self.funcset = {call['num'] for call in calls} | {self.name}
-        self.num_states = sum(funcs[name].count_states(1) for name in self.funcset)
+        self.num_states = 13
+        # self.num_states = sum(funcs[name].count_states(1) for name in self.funcset)
         code = ''
         # allocate return
         code += 'return pos\n'
@@ -120,6 +158,19 @@ class Function:
         self.stackptr_pos = sm.dp
         for _ in range(STKPTRBYTES):
             code += sm.load_constant(0, debug)
+        # set -1th place of state stack to finish state
+        ptr = sm.dp
+        code += sm.load_hex(STKPTRBYTES, 0, debug)
+        code += sm.load_hex(STKPTRBYTES, 1, debug)
+        code += sm.subtract_hex(STKPTRBYTES, debug)
+        finish = [int(ch) for ch in f'{self.num_states:b}'][::-1]
+        for i, num in enumerate(finish):
+            code += sm.load_constant(num, debug)
+            code += sm.load_constant(i, debug)
+            for j in range(STKPTRBYTES)[::-1]:
+                code += sm.load_variable(ptr + j, debug)
+            code += sm.multi_dim_store(self.state_stack_pos, self.state_stack_shape, debug)
+        code += sm.pop(STKPTRBYTES, debug)
         return code
 
     def codegen(self, sm, funcs, tables, args, debug):
@@ -141,16 +192,23 @@ class Function:
         code += sm.begin_while(debug)
 
         for _ in range(self.num_states.bit_length()):
-            sm.load_constant(0)
-        sm.pop(self.num_states.bit_length())
+            code += sm.load_constant(0, debug)
+        self.base = sm.dp
+        blocks = [[]]
+        self.blockgen(sm, funcs, tables, blocks, self, debug)
+        for block in blocks:
+            for cd in block:
+                code += cd
+        code += sm.pop(self.num_states.bit_length(), debug)
 
         code += 'cond\n'
-        for i, ch in enumerate(f'{self.num_states:b}'):
-            for _ in range(STKPTRBYTES):
-                code += sm.load_constant(0, debug)
+        finish = [int(ch) for ch in f'{self.num_states:b}'][::-1]
+        for i, num in enumerate(finish):
             code += sm.load_constant(i, debug)
+            for j in range(STKPTRBYTES):
+                code += sm.load_constant(0, debug)
             code += sm.multi_dim_load(self.state_stack_pos, self.state_stack_shape, debug)
-            code += sm.load_constant(int(ch), debug)
+            code += sm.load_constant(num, debug)
             code += sm.notequal(debug)
         for _ in range(self.num_states.bit_length() - 1):
             code += sm.boolor(debug)
@@ -172,6 +230,15 @@ class Function:
             if isinstance(st, StReturn):
                 break
         return index
+
+    def blockgen(self, sm, funcs, tables, blocks, func, debug):
+        lvars = {}
+        for arg in self.args:
+            assert arg.name not in lvars
+            lvars[arg.name] = {'type': 'variable', 'pos': sm.dp, 'size': 1}
+            blocks[-1] += [func.pop_frame_stack(sm, debug)]
+        for st in self.body:
+            st.blockgen(sm, funcs, tables + [lvars], blocks, func, debug)
 
 
 class Statement:
@@ -257,6 +324,16 @@ class StReturn(Statement):
 
     def count_states(self, index):
         return self.expr.count_states(index)
+
+    def blockgen(self, sm, funcs, tables, blocks, func, debug):
+        blocks[-1] += ['return\n']
+        if self.expr.needs_expansion():
+            raise NotImplementedError
+        else:
+            blocks[-1] += [self.expr.codegen(sm, funcs, tables, debug)]
+        blocks[-1] += [func.push_frame_stack(sm, debug)]
+        blocks[-1] += [sm.pop(sm.dp - func.base, debug)]
+        blocks[-1] += [func.pop_state_stack(sm, debug)]
 
 
 class StWhile(Statement):
@@ -474,10 +551,10 @@ class StCall(Statement):
     def string(self, level):
         return f'{indent(level)}{self.expr};'
 
-    def builtin_putchar(self, sm, funcs, tables, debug):
+    def builtin_putchar(self, sm, debug):
         return sm.put_character(debug)
 
-    def builtin_putint(self, sm, funcs, tables, debug):
+    def builtin_putint(self, sm, debug):
         code = ''
         pos = sm.dp - 1
         code += sm.load_variable(pos, debug)
@@ -521,9 +598,9 @@ class StCall(Statement):
                 raise SyntaxError(f'Number of arguments of the built-in putchar and putint is 1.')
             code = self.expr.args[0].codegen(sm, funcs, tables, debug)
             if self.expr.name == 'putchar':
-                return code + self.builtin_putchar(sm, funcs, tables, debug)
+                return code + self.builtin_putchar(sm, debug)
             else:
-                return code + self.builtin_putint(sm, funcs, tables, debug)
+                return code + self.builtin_putint(sm, debug)
         else:
             base = sm.dp
             code = self.expr.codegen(sm, funcs, tables, debug)
@@ -531,8 +608,6 @@ class StCall(Statement):
             return code
 
     def extract_calls(self, index, calls):
-        for arg in self.expr.args:
-            index = arg.extract_calls(index, calls)
         return self.expr.extract_calls(index, calls)
 
     def needs_expansion(self):
@@ -545,6 +620,19 @@ class StCall(Statement):
 
     def count_states(self, index):
         return self.expr.count_states(index)
+
+    def blockgen(self, sm, funcs, tables, blocks, func, debug):
+        if self.expr.name in ['putchar', 'putint']:
+            if self.expr.args[0].needs_expansion():
+                raise NotImplementedError
+            else:
+                blocks[-1] += [self.expr.args[0].codegen(sm, funcs, tables, debug)]
+            if self.expr.name == 'putchar':
+                blocks[-1] += [self.builtin_putchar(sm, debug)]
+            else:
+                blocks[-1] += [self.builtin_putint(sm, debug)]
+        else:
+            raise NotImplementedError
 
 
 class StInitVariable(Statement):
