@@ -83,13 +83,42 @@ class TestParser(unittest.TestCase):
     def test_005(self):
         prog = '''
         fn func(var a, var b, var c, var d, var e) {
+            putchar(a);
+            putchar(b);
+            putchar(c);
+            putchar(d);
+            putchar(e);
+            putchar('\\n');
             putint(a);
+            putchar(' ');
             putint(b);
+            putchar(' ');
             putint(c);
+            putchar(' ');
             putint(d);
+            putchar(' ');
             putint(e);
+            putchar('\\n');
         }
-        func(3, 4, 5, 6, 7);
+        func('a', 'b', 'c', 'd', 'e');
+        '''
+        debug = True
+        lex = LexicalAnalyzer(prog)
+        lex.analyze()
+        parser = Parser(lex)
+        ast = parser.parse_program()
+        print(f'[\n{ast.string(1)}]')
+        bf = ast.codegen(debug)
+        print(bf)
+
+    def test_006(self):
+        prog = '''
+        fn func(var a) {
+            if (a) {
+                func(a - 1);
+            }
+        }
+        func(10);
         '''
         debug = True
         lex = LexicalAnalyzer(prog)
