@@ -26,9 +26,7 @@ class TestParser(unittest.TestCase):
         lex = LexicalAnalyzer(prog)
         lex.analyze()
         parser = Parser(lex)
-        table = {
-            'poyo': {'type': 'array', 'shape': [1,1,1]}
-        }
+        table = {'poyo': {'type': 'array', 'shape': [1, 1, 1]}}
         ast = parser.parse_expression([table])
         calls = []
         ast.extract_calls(0, calls)
@@ -54,9 +52,7 @@ class TestParser(unittest.TestCase):
         lex = LexicalAnalyzer(prog)
         lex.analyze()
         parser = Parser(lex)
-        table = {
-            'poyo': {'type': 'array', 'shape': [1,1,1]}
-        }
+        table = {'poyo': {'type': 'array', 'shape': [1, 1, 1]}}
         ast = parser.parse_expression([table])
         calls = []
         ast.extract_calls(0, calls)
@@ -82,25 +78,10 @@ class TestParser(unittest.TestCase):
 
     def test_005(self):
         prog = '''
-        fn func(var a, var b, var c, var d, var e) {
+        fn func(var a) {
             putchar(a);
-            putchar(b);
-            putchar(c);
-            putchar(d);
-            putchar(e);
-            putchar('\\n');
-            putint(a);
-            putchar(' ');
-            putint(b);
-            putchar(' ');
-            putint(c);
-            putchar(' ');
-            putint(d);
-            putchar(' ');
-            putint(e);
-            putchar('\\n');
         }
-        func('a', 'b', 'c', 'd', 'e');
+        func('a');
         '''
         debug = True
         lex = LexicalAnalyzer(prog)

@@ -6,7 +6,7 @@ from lexer import Token, LexicalAnalyzer
 from stack_machine import *
 
 STKBYTES = 2
-STKPTRBYTES = STKBYTES - 1
+
 
 def indent(level):
     return '    ' * level
@@ -59,76 +59,63 @@ class Function:
         code += f'{indent(level)}}}'
         return code
 
-    def push_frame_stack(self, sm, debug):
-        code = 'push_frame_stack\n'
-        begin = sm.dp
-        for i in range(STKBYTES)[::-1]:
-            code += sm.load_variable(self.frameptr_pos + i, debug)
-        code += sm.multi_dim_store(self.frame_stack_pos, self.frame_stack_shape, debug)
-        for i in range(STKBYTES):
-            code += sm.load_variable(self.frameptr_pos + i, debug)
-        code += sm.load_hex(STKBYTES, 1, debug)
-        code += sm.add_hex(STKBYTES, debug)
-        for i in range(STKBYTES)[::-1]:
-            code += sm.store_variable(self.frameptr_pos + i, debug)
-        print(f'push frame stack {begin} {sm.dp}')
+    def store_frame(self, sm, size, debug):
+        code = f'store stack {size}\n'
+        for _ in range(size):
+            for i in range(STKBYTES)[::-1]:
+                code += sm.load_variable(self.frameptr_pos + i, debug)
+            code += sm.multi_dim_store(self.frame_pos, self.frame_shape, debug)
+            for i in range(STKBYTES):
+                code += sm.load_variable(self.frameptr_pos + i, debug)
+            code += sm.load_hex(STKBYTES, 1, debug)
+            code += sm.add_hex(STKBYTES, debug)
+            for i in range(STKBYTES)[::-1]:
+                code += sm.store_variable(self.frameptr_pos + i, debug)
         return code
 
-    def pop_frame_stack(self, sm, debug):
-        code = 'pop_frame_stack\n'
-        begin = sm.dp
-        for i in range(STKBYTES):
-            code += sm.load_variable(self.frameptr_pos + i, debug)
-        code += sm.load_hex(STKBYTES, 1, debug)
-        code += sm.subtract_hex(STKBYTES, debug)
-        for i in range(STKBYTES)[::-1]:
-            code += sm.store_variable(self.frameptr_pos + i, debug)
-        for i in range(STKBYTES)[::-1]:
-            code += sm.load_variable(self.frameptr_pos + i, debug)
-        code += sm.multi_dim_load(self.frame_stack_pos, self.frame_stack_shape, debug)
-        print(f'pop frame stack {begin} {sm.dp}')
+    def restore_frame(self, sm, size, debug):
+        code = f'restore stack {size}\n'
+        for _ in range(size):
+            for i in range(STKBYTES):
+                code += sm.load_variable(self.frameptr_pos + i, debug)
+            code += sm.load_hex(STKBYTES, 1, debug)
+            code += sm.subtract_hex(STKBYTES, debug)
+            for i in range(STKBYTES)[::-1]:
+                code += sm.store_variable(self.frameptr_pos + i, debug)
+            for i in range(STKBYTES)[::-1]:
+                code += sm.load_variable(self.frameptr_pos + i, debug)
+            code += sm.multi_dim_load(self.frame_pos, self.frame_shape, debug)
         return code
 
-    def pop_state_stack(self, sm, debug):
-        '''
-        状態スタックの状態スタックポインタ番目に停止状態を代入
-        状態スタックポインタをデクリメント
-        状態スタックの状態スタックポインタ番目を読んで、状態変数に代入
-        '''
-        code = 'pop_state_stack\n'
-        begin = sm.dp
-        finish = [int(ch) for ch in f'{self.num_states:b}'][::-1]
-        for i, num in enumerate(finish):
-            code += sm.load_constant(num, debug)
-            code += sm.load_constant(i, debug)
-            for j in range(STKPTRBYTES)[::-1]:
-                code += sm.load_variable(self.stackptr_pos + j, debug)
-            code += sm.multi_dim_store(self.state_stack_pos, self.state_stack_shape, debug)
-
-        for i in range(STKPTRBYTES):
-            code += sm.load_variable(self.stackptr_pos + i, debug)
-        code += sm.load_hex(STKPTRBYTES, 1, debug)
-        code += sm.subtract_hex(STKPTRBYTES, debug)
-        for i in range(STKPTRBYTES)[::-1]:
-            code += sm.store_variable(self.stackptr_pos + i, debug)
-
-        for i in range(self.num_states.bit_length())[::-1]:
-            code += sm.load_constant(i, debug)
-            for j in range(STKPTRBYTES)[::-1]:
-                code += sm.load_variable(self.stackptr_pos + j, debug)
-            code += sm.multi_dim_load(self.state_stack_pos, self.state_stack_shape, debug)
-        for i in range(self.num_states.bit_length()):
-            code += sm.store_variable(self.state_pos + i, debug)
+    def store_args(self, sm, size, debug):
+        code = f'store arguments {size}\n'
+        for _ in range(size):
+            code += sm.load_variable(self.argbuffptr_pos, debug)
+            code += sm.multi_dim_store(self.argbuff_pos, [self.max_arglen], debug)
+            code += sm.load_variable(self.argbuffptr_pos, debug)
+            code += sm.load_constant(1, debug)
+            code += sm.add(debug)
+            code += sm.store_variable(self.argbuffptr_pos, debug)
         return code
 
-    def set_state(self, state, sm, debug):
+    def restore_args(self, sm, size, debug):
+        code = f'restore arguments {size}\n'
+        for _ in range(size):
+            code += sm.load_variable(self.argbuffptr_pos, debug)
+            code += sm.load_constant(1, debug)
+            code += sm.subtract(debug)
+            code += sm.store_variable(self.argbuffptr_pos, debug)
+            code += sm.load_variable(self.argbuffptr_pos, debug)
+            code += sm.multi_dim_load(self.argbuff_pos, [self.max_arglen], debug)
+        return code
+
+    def set_state(self, sm, state, debug):
         state = [int(ch) for ch in f'{state:0{self.num_states.bit_length()}b}']
         code = 'set state\n'
         for i, num in enumerate(state):
             code += sm.load_constant(num, debug)
             code += sm.store_variable(self.state_pos + i, debug)
         return code
-        
 
     def init_callenv(self, sm, funcs, debug):
         calls = []
@@ -136,9 +123,10 @@ class Function:
         self.funcset = {call['name'] for call in calls} | {self.name}
         self.num_states = 0
         self.func_table = {}
-        for fname in self.funcset:
-            self.func_table[fname] = self.num_states
-            self.num_states += funcs[fname].count_states(1)
+        for name in self.funcset:
+            self.func_table[name] = self.num_states
+            self.num_states += funcs[name].count_states(1)
+        self.max_arglen = max(1, max(len(funcs[name].args) for name in self.funcset))
         code = ''
         # allocate return
         code += 'return pos\n'
@@ -146,87 +134,87 @@ class Function:
         code += sm.load_constant(0, debug)
         # allocate frame stack
         code += 'frame stack\n'
-        self.frame_stack_shape = [16] * STKBYTES
-        code += sm.push_multi_dim_array(self.frame_stack_shape, debug)
-        self.frame_stack_pos = sm.dp
-        # allocate state variable stack
-        code += 'state var stack\n'
-        self.state_stack_shape = [16] * STKPTRBYTES + [self.num_states.bit_length()]
-        code += sm.push_multi_dim_array(self.state_stack_shape, debug)
-        self.state_stack_pos = sm.dp
-        # allocate frame pointer (ptr of the frame stack)
-        code += 'frame ptr\n'
+        self.frame_shape = [16] * STKBYTES
+        code += sm.push_multi_dim_array(self.frame_shape, debug)
+        self.frame_pos = sm.dp
+        # allocate frame stack pointer (big-endian, right is lower)
+        code += 'frame stack pointer\n'
         self.frameptr_pos = sm.dp
         for _ in range(STKBYTES):
             code += sm.load_constant(0, debug)
+        # allocate argument buffer
+        code += 'argument buffer\n'
+        code += sm.push_multi_dim_array([self.max_arglen], debug)
+        self.argbuff_pos = sm.dp
+        code += 'argument buffer pointer\n'
+        self.argbuffptr_pos = sm.dp
+        code += sm.load_constant(0, debug)
         # allocate state variable
-        code += 'state var\n'
+        code += 'state variable\n'
         self.state_pos = sm.dp
         for _ in range(self.num_states.bit_length()):
             code += sm.load_constant(0, debug)
-        # allocate stack pointer (recursion depth or ptr of the state variable stack)
-        code += 'stack ptr\n'
-        self.stackptr_pos = sm.dp
-        for _ in range(STKPTRBYTES):
-            code += sm.load_constant(0, debug)
-        # set -1th place of state stack to finish state
-        ptr = sm.dp
-        code += sm.load_hex(STKPTRBYTES, 0, debug)
-        code += sm.load_hex(STKPTRBYTES, 1, debug)
-        code += sm.subtract_hex(STKPTRBYTES, debug)
-        finish = [int(ch) for ch in f'{self.num_states:b}'][::-1]
-        for i, num in enumerate(finish):
-            code += sm.load_constant(num, debug)
-            code += sm.load_constant(i, debug)
-            for j in range(STKPTRBYTES)[::-1]:
-                code += sm.load_variable(ptr + j, debug)
-            code += sm.multi_dim_store(self.state_stack_pos, self.state_stack_shape, debug)
-        code += sm.pop(STKPTRBYTES, debug)
         return code
 
     def codegen(self, sm, funcs, tables, args, debug):
         if len(args) != len(self.args):
-            raise SyntaxError(f'The function {repr(self.name)} must take just {len(self.args)} arguments, but entered {len(args)}.')
+            raise SyntaxError(
+                f'The function {repr(self.name)} must take just {len(self.args)} arguments, but entered {len(args)}.'
+            )
         code = self.init_callenv(sm, funcs, debug)
-        # load args
-        base = sm.dp
-        code += 'load args\n'
+        # load arguments
+        code += 'load arguments\n'
         for arg, argv in zip(self.args, args):
             code += StInitVariable(arg.name, argv).allocate(sm, funcs, tables + [{}], debug)
-        # push args into the frame stack
-        code += 'push args into the frame stack\n'
-        for _ in self.args:
-            code += self.push_frame_stack(sm, debug)
-        # begin main loop
-        code += 'begin main loop\n'
+        code += self.store_args(sm, len(args), debug)
+
+        # mainloop
+        code += 'mainloop\n'
         code += sm.load_constant(1, debug)
         code += sm.begin_while(debug)
 
         for _ in range(self.num_states.bit_length()):
-            code += sm.load_constant(0, debug)
+            sm.load_constant(0, debug)
+            sm.load_constant(0, debug)
         self.base = sm.dp
         blocks = [[]]
         self.blockgen(sm, funcs, tables, blocks, self, debug)
-        for block in blocks:
-            for cd in block:
-                code += cd
-        code += sm.pop(self.num_states.bit_length(), debug)
+        sm.pop(self.num_states.bit_length() * 2, debug)
 
-        code += 'cond\n'
-        finish = [int(ch) for ch in f'{self.num_states:b}'][::-1]
+        def rec(blkidx):
+            code = ''
+            if len(blkidx) == self.num_states.bit_length():
+                idx = sum(num << place for place, num in enumerate(blkidx))
+                if idx < len(blocks):
+                    for line in blocks[idx]:
+                        code += line
+            else:
+                code += sm.load_variable(self.state_pos + len(blkidx), debug)
+                code += sm.begin_if(debug)
+                code += rec(blkidx + [1])
+                code += sm.begin_else(debug)
+                code += rec(blkidx + [0])
+                code += sm.end_if(debug)
+            return code
+
+        code += rec([])
+
+        # check condition
+        code += 'condition\n'
+        finish = [int(ch) for ch in f'{self.num_states:b}']
         for i, num in enumerate(finish):
-            code += sm.load_constant(i, debug)
-            for j in range(STKPTRBYTES):
-                code += sm.load_constant(0, debug)
-            code += sm.multi_dim_load(self.state_stack_pos, self.state_stack_shape, debug)
+            code += sm.load_variable(self.state_pos + i, debug)
             code += sm.load_constant(num, debug)
             code += sm.notequal(debug)
         for _ in range(self.num_states.bit_length() - 1):
             code += sm.boolor(debug)
         code += sm.end_while(debug)
-        code += 'end main loop\n'
-
-        code += 'clean\n'
+        # return
+        for _ in range(STKBYTES):
+            code += sm.load_constant(0, debug)
+        code += sm.multi_dim_load(self.frame_pos, self.frame_shape, debug)
+        code += sm.store_variable(self.return_pos, debug)
+        # clean
         code += sm.pop(sm.dp - self.return_pos - 1, debug)
         return code
 
@@ -244,10 +232,10 @@ class Function:
 
     def blockgen(self, sm, funcs, tables, blocks, func, debug):
         lvars = {}
-        for arg in self.args:
+        for i, arg in enumerate(func.args):
             assert arg.name not in lvars
-            lvars[arg.name] = {'type': 'variable', 'pos': sm.dp, 'size': 1}
-            blocks[-1] += [func.pop_frame_stack(sm, debug)]
+            lvars[arg.name] = {'type': 'variable', 'pos': sm.dp + i, 'size': 1}
+        blocks[-1] += [func.restore_args(sm, len(func.args), debug)]
         for st in self.body:
             st.blockgen(sm, funcs, tables + [lvars], blocks, func, debug)
 
@@ -338,10 +326,25 @@ class StReturn(Statement):
 
     def blockgen(self, sm, funcs, tables, blocks, func, debug):
         blocks[-1] += ['return\n']
-        blocks[-1] += [self.expr.codegen(sm, funcs, tables, debug)]
-        blocks[-1] += [func.push_frame_stack(sm, debug)]
+        if self.expr.needs_expansion():
+            self.expr.blockgen(sm, funcs, tables, blocks, func, debug)
+        else:
+            blocks[-1] += [self.expr.codegen(sm, funcs, tables, debug)]
+        blocks[-1] += [func.store_args(sm, 1, debug)]
         blocks[-1] += [sm.pop(sm.dp - func.base, debug)]
-        blocks[-1] += [func.pop_state_stack(sm, debug)]
+        for i in range(STKBYTES):
+            blocks[-1] += [sm.load_variable(func.state_pos + i, debug)]
+            blocks[-1] += [sm.load_constant(0, debug)]
+            blocks[-1] += [sm.equal(debug)]
+        for _ in range(STKBYTES - 1):
+            blocks[-1] += [sm.booland(debug)]
+        blocks[-1] += [sm.begin_if(debug)]
+        blocks[-1] += [func.set_state(sm, func.num_states, debug)]
+        blocks[-1] += [sm.begin_else(debug)]
+        blocks[-1] += [func.restore_frame(sm, STKBYTES, debug)]
+        for i in range(STKBYTES)[::-1]:
+            blocks[-1] += [sm.store_variable(func.state_pos + i, debug)]
+        blocks[-1] += [sm.end_if(debug)]
 
 
 class StWhile(Statement):
@@ -978,6 +981,10 @@ class ExpInteger(Expression):
     def count_states(self, index):
         return index
 
+    def blockgen(self, sm, funcs, tables, blocks, func, debug):
+        blocks[-1] += [self.codegen(sm, funcs, tables, debug)]
+
+
 class ExpCharacter(Expression):
     def __init__(self, value):
         self.value = value
@@ -999,6 +1006,9 @@ class ExpCharacter(Expression):
 
     def count_states(self, index):
         return index
+
+    def blockgen(self, sm, funcs, tables, blocks, func, debug):
+        blocks[-1] += [self.codegen(sm, funcs, tables, debug)]
 
 
 class ExpLogicalOr(Expression):
@@ -1247,6 +1257,7 @@ class ExpMultiplicative(Expression):
         index = self.left.count_states(index)
         return self.right.count_states(index)
 
+
 class ExpUnary(Expression):
     def __init__(self, mode, operand):
         self.mode = mode
@@ -1284,6 +1295,7 @@ class ExpUnary(Expression):
 
     def count_states(self, index):
         return self.operand.count_states(index)
+
 
 class Parser:
     def __init__(self, lex):

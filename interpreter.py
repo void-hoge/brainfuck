@@ -67,10 +67,18 @@ def interpreter(rawprog, ist=sys.stdin, ost=sys.stdout, dump=False):
 
 if __name__ == '__main__':
     from termcolor import colored
+
     linelen = 50
     with open(sys.argv[1]) as f:
         dp, data, step = interpreter(rawprog=f.read())
         print(f'{dp=}', file=sys.stderr)
         print(f'{step=}', file=sys.stderr)
         for i in range(0, len(data), linelen):
-            print(f'{i:5} :{i + linelen:5} |', ''.join(colored(f'{num:3}', 'black', 'on_white') if i + j == dp else f'{num:3}' for j, num in enumerate(data[i:i+linelen])), file=sys.stderr)
+            print(
+                f'{i:5} :{i + linelen:5} |',
+                ''.join(
+                    colored(f'{num:3}', 'black', 'on_white') if i + j == dp else f'{num:3}'
+                    for j, num in enumerate(data[i : i + linelen])
+                ),
+                file=sys.stderr,
+            )
