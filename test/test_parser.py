@@ -94,12 +94,37 @@ class TestParser(unittest.TestCase):
 
     def test_006(self):
         prog = '''
-        fn func(var a) {
-            if (a) {
-                func(a - 1);
-            }
+        fn hoge(var a) {
+            putchar(a);
+            return 'd';
         }
-        func(10);
+        fn poyo(var p) {
+            putchar(hoge(p));
+            putchar(p + 3);
+            return 'p';
+        }
+        putchar(poyo('f'));
+        '''
+        debug = True
+        lex = LexicalAnalyzer(prog)
+        lex.analyze()
+        parser = Parser(lex)
+        ast = parser.parse_program()
+        print(f'[\n{ast.string(1)}]')
+        bf = ast.codegen(debug)
+        print(bf)
+
+    def test_007(self):
+        prog = '''
+        fn hoge(var a) {
+            putchar(a);
+            if (a == 0) {
+                return 0;
+            }
+            hoge(a - 1);
+            return 0;
+        }
+        putchar(hoge('f'));
         '''
         debug = True
         lex = LexicalAnalyzer(prog)

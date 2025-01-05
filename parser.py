@@ -110,9 +110,9 @@ class Function:
         return code
 
     def set_state(self, sm, state, debug):
-        state = [int(ch) for ch in f'{state:0{self.num_states.bit_length()}b}']
+        statebits = [int(ch) for ch in f'{state:0{self.num_states.bit_length()}b}']
         code = 'set state\n'
-        for i, num in enumerate(state):
+        for i, num in enumerate(statebits):
             code += sm.load_constant(num, debug)
             code += sm.store_variable(self.state_pos + i, debug)
         return code
@@ -120,13 +120,15 @@ class Function:
     def init_callenv(self, sm, funcs, debug):
         calls = []
         self.extract_calls(0, calls)
-        self.funcset = {call['name'] for call in calls} | {self.name}
+        self.funcset = {call['name'] : None for call in calls}
+        self.funcset[self.name] = None
         self.num_states = 0
         self.func_table = {}
-        for name in self.funcset:
+        for name in self.funcset.keys():
             self.func_table[name] = self.num_states
             self.num_states += funcs[name].count_states(1)
-        self.max_arglen = max(1, max(len(funcs[name].args) for name in self.funcset))
+        self.max_arglen = max(1, max(len(funcs[name].args) for name in self.funcset.keys()))
+        print(f'[{self.func_table}]')
         code = ''
         # allocate return
         code += 'return pos\n'
@@ -154,6 +156,8 @@ class Function:
         self.state_pos = sm.dp
         for _ in range(self.num_states.bit_length()):
             code += sm.load_constant(0, debug)
+        code += self.set_state(sm, self.func_table[self.name], debug)
+        print(f'startpoint {self.name} {self.func_table[self.name]}')
         return code
 
     def codegen(self, sm, funcs, tables, args, debug):
@@ -177,19 +181,26 @@ class Function:
             sm.load_constant(0, debug)
             sm.load_constant(0, debug)
         self.base = sm.dp
-        blocks = [[]]
-        self.blockgen(sm, funcs, tables, blocks, self, debug)
+        blocks = []
+        #self.blockgen(sm, self.func_table, tables, blocks, self, debug)
+        for name in self.funcset.keys():
+            #if name != self.name:
+            funcs[name].blockgen(sm, self.func_table, tables, blocks, self, debug)
         sm.pop(self.num_states.bit_length() * 2, debug)
+
+        assert len(blocks) == self.num_states
 
         def rec(blkidx):
             code = ''
             if len(blkidx) == self.num_states.bit_length():
                 idx = sum(num << place for place, num in enumerate(blkidx))
                 if idx < len(blocks):
+                    code += f'begin block {idx}\n'
                     for line in blocks[idx]:
                         code += line
+                    code += f'end block {idx}\n'
             else:
-                code += sm.load_variable(self.state_pos + len(blkidx), debug)
+                code += sm.load_variable(self.state_pos + self.num_states.bit_length() - len(blkidx) - 1, debug)
                 code += sm.begin_if(debug)
                 code += rec(blkidx + [1])
                 code += sm.begin_else(debug)
@@ -210,9 +221,8 @@ class Function:
             code += sm.boolor(debug)
         code += sm.end_while(debug)
         # return
-        for _ in range(STKBYTES):
-            code += sm.load_constant(0, debug)
-        code += sm.multi_dim_load(self.frame_pos, self.frame_shape, debug)
+        code += sm.load_constant(0, debug)
+        code += sm.multi_dim_load(self.argbuff_pos, [self.max_arglen], debug)
         code += sm.store_variable(self.return_pos, debug)
         # clean
         code += sm.pop(sm.dp - self.return_pos - 1, debug)
@@ -231,13 +241,16 @@ class Function:
         return index
 
     def blockgen(self, sm, funcs, tables, blocks, func, debug):
+        blocks += [[]]
         lvars = {}
-        for i, arg in enumerate(func.args):
+        for i, arg in enumerate(self.args):
             assert arg.name not in lvars
             lvars[arg.name] = {'type': 'variable', 'pos': sm.dp + i, 'size': 1}
         blocks[-1] += [func.restore_args(sm, len(func.args), debug)]
         for st in self.body:
             st.blockgen(sm, funcs, tables + [lvars], blocks, func, debug)
+            if isinstance(st, StReturn):
+                break
 
 
 class Statement:
@@ -325,15 +338,17 @@ class StReturn(Statement):
         return self.expr.count_states(index)
 
     def blockgen(self, sm, funcs, tables, blocks, func, debug):
+        print(f'streturn {sm.dp}')
         blocks[-1] += ['return\n']
         if self.expr.needs_expansion():
             self.expr.blockgen(sm, funcs, tables, blocks, func, debug)
         else:
             blocks[-1] += [self.expr.codegen(sm, funcs, tables, debug)]
         blocks[-1] += [func.store_args(sm, 1, debug)]
-        blocks[-1] += [sm.pop(sm.dp - func.base, debug)]
+        # blocks[-1] += [sm.pop(sm.dp - func.base, debug)]
+
         for i in range(STKBYTES):
-            blocks[-1] += [sm.load_variable(func.state_pos + i, debug)]
+            blocks[-1] += [sm.load_variable(func.frameptr_pos + i, debug)]
             blocks[-1] += [sm.load_constant(0, debug)]
             blocks[-1] += [sm.equal(debug)]
         for _ in range(STKBYTES - 1):
@@ -341,10 +356,11 @@ class StReturn(Statement):
         blocks[-1] += [sm.begin_if(debug)]
         blocks[-1] += [func.set_state(sm, func.num_states, debug)]
         blocks[-1] += [sm.begin_else(debug)]
-        blocks[-1] += [func.restore_frame(sm, STKBYTES, debug)]
-        for i in range(STKBYTES)[::-1]:
+        blocks[-1] += [func.restore_frame(sm, func.num_states.bit_length(), debug)]
+        for i in range(func.num_states.bit_length())[::-1]:
             blocks[-1] += [sm.store_variable(func.state_pos + i, debug)]
         blocks[-1] += [sm.end_if(debug)]
+        print(f'endof streturn {sm.dp}')
 
 
 class StWhile(Statement):
@@ -475,60 +491,68 @@ class StIf(Statement):
     def blockgen(self, sm, funcs, tables, blocks, func, debug):
         blocks[-1] += ['if\n']
         if self.needs_expansion():
-            blocks[-1] += [self.cond.codegen(sm, funcs, tables, debug)]
+            if self.cond.needs_expansion():
+                self.cond.blockgen(sm, funcs, tables, blocks, func, debug)
+            else:
+                blocks[-1] += [self.cond.codegen(sm, funcs, tables, debug)]
             blocks[-1] += [sm.begin_if(debug)]
-            blocks[-1] += [func.set_state(len(blocks), sm, debug)]
+            blocks[-1] += [func.set_state(sm, len(blocks), debug)]
             blocks[-1] += [sm.begin_else(debug)]
             gotoelse = len(blocks) - 1, len(blocks[-1])
             blocks[-1] += ['dummy']
             blocks[-1] += [sm.end_if(debug)]
             basesize = sm.dp - func.base
-            for _ in range(basesize):
-                blocks[-1] += [func.push_frame_stack(sm, debug)]
+            print(sm.dp)
+            blocks[-1] += [func.store_frame(sm, basesize, debug)]
 
             # then
             blocks += [[]]
-            for _ in range(basesize):
-                blocks[-1] += [func.pop_frame_stack(sm, debug)]
+            blocks[-1] += [func.restore_frame(sm, basesize, debug)]
+            print('then start: ', sm.dp)
+            lbase = sm.dp
             lvars = {}
             for st in self.body_then + self.body_else:
                 if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
                     blocks[-1] += [st.allocate(sm, funcs, tables + [lvars], debug)]
+                if isinstance(st, StReturn):
+                    break
             size = sum(var['size'] for var in lvars.items())
             for st in self.body_then:
                 st.blockgen(sm, funcs, tables, blocks, func, debug)
+                if isinstance(st, StReturn):
+                    break
             gotobase = len(blocks) - 1, len(blocks[-1])
             blocks[-1] += ['dummy']
             blocks[-1] += [sm.pop(size, debug)]
-            for _ in range(basesize):
-                blocks[-1] += [func.push_frame_stack(sm, debug)]
+            blocks[-1] += [func.store_frame(sm, basesize, debug)]
 
             # else
             blocks += [[]]
-            for _ in range(basesize):
-                blocks[-1] += [func.pop_frame_stack(sm, debug)]
+            blocks[-1] += [func.restore_frame(sm, basesize, debug)]
+            print(f'else start {sm.dp}')
             lvars = {}
             for st in self.body_then + self.body_else:
                 if isinstance(st, StInitVariable) or isinstance(st, StInitArray):
                     blocks[-1] += [st.allocate(sm, funcs, tables + [lvars], debug)]
+                if isinstance(st, StReturn):
+                    break
             size = sum(var['size'] for var in lvars.items())
             for st in self.body_else:
                 st.blockgen(sm, funcs, tables, blocks, func, debug)
-            blocks[-1] += [func.set_state(len(blocks), sm, debug)]
+                if isinstance(st, StReturn):
+                    break
+            blocks[-1] += [func.set_state(sm, len(blocks), debug)]
             blocks[-1] += [sm.pop(size, debug)]
-            for _ in range(basesize):
-                blocks[-1] += [func.push_frame_stack(sm, debug)]
-
+            blocks[-1] += [func.store_frame(sm, basesize, debug)]
             blk, idx = gotoelse
-            blocks[blk][idx] = [func.set_state(len(blocks) - 1, sm, debug)]
+            blocks[blk][idx] = [func.set_state(sm, len(blocks) - 1, debug)]
 
             # base
             blocks += [[]]
-            for _ in range(basesize):
-                blocks[-1] += [func.pop_frame_stack(sm, debug)]
-
+            blocks[-1] += [func.restore_frame(sm, basesize, debug)]
+            print(sm.dp)
             blk, idx = gotobase
-            blocks[blk][idx] = [func.set_state(len(blocks) - 1, sm, debug)]
+            blocks[blk][idx] = [func.set_state(sm, len(blocks) - 1, debug)]
         else:
             blocks[-1] += self.codegen(sm, funcs, tables, debug)
 
@@ -695,7 +719,7 @@ class StCall(Statement):
     def blockgen(self, sm, funcs, tables, blocks, func, debug):
         if self.expr.name in ['putchar', 'putint']:
             if self.expr.args[0].needs_expansion():
-                self.expr.blockgen(sm, funcs, tables, blocks, func, debug)
+                self.expr.args[0].blockgen(sm, funcs, tables, blocks, func, debug)
             else:
                 blocks[-1] += [self.expr.args[0].codegen(sm, funcs, tables, debug)]
             if self.expr.name == 'putchar':
@@ -705,6 +729,8 @@ class StCall(Statement):
         else:
             base = sm.dp
             self.expr.blockgen(sm, funcs, tables, blocks, func, debug)
+            print(sm.dp - base)
+            assert sm.dp - base == 1
             blocks[-1] += [sm.pop(sm.dp - base, debug)]
 
 
@@ -895,7 +921,32 @@ class ExpCall(Expression):
         elif self.name == 'getint':
             blocks[-1] += [self.builtin_getint(sm, funcs, tables, debug)]
         else:
-            raise NotImplementedError
+            # load arguments
+            for arg in self.args:
+                if arg.needs_expansion():
+                    arg.blockgen(sm, funcs, tables, blocks, func, debug)
+                else:
+                    blocks[-1] += [arg.codegen(sm, funcs, tables, debug)]
+            blocks[-1] += [func.store_args(sm, len(self.args), debug)]
+            # store frame
+            lsize = sm.dp - func.base
+            blocks[-1] += [func.store_frame(sm, lsize, debug)]
+            # set returning state
+            nextstate = len(blocks) - 1, len(blocks[-1])
+            blocks[-1] += [''.join(sm.load_constant(0, debug) for _ in range(func.num_states.bit_length()))] # dummy
+            blocks[-1] += [func.store_frame(sm, func.num_states.bit_length(), debug)]
+            # set next state
+            blocks[-1] += [func.set_state(sm, funcs[self.name], debug)]
+            # after return
+            blocks += [[]]
+            blocks[-1] += [func.restore_frame(sm, lsize, debug)]
+            blocks[-1] += [func.restore_args(sm, 1, debug)]
+            blk, idx = nextstate
+            state = [int(ch) for ch in f'{len(blocks) - 1:0{func.num_states.bit_length()}b}']
+            blocks[blk][idx] = ''.join([
+                sm.load_constant(num, debug) for num in state
+            ])
+            sm.dp -= func.num_states.bit_length()
 
 
 class ExpArrayElement(Expression):
@@ -947,6 +998,7 @@ class ExpVariable(Expression):
         var = next((table[self.name] for table in tables[::-1] if self.name in table), None)
         assert var
         assert var['type'] == 'variable'
+        print(var['pos'], sm.dp)
         return sm.load_variable(var['pos'], debug)
 
     def extract_calls(self, index, calls):

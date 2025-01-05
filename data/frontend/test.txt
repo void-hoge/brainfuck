@@ -1,13 +1,10 @@
-var a;
-fn main() {
-    while (0) {
-        var a;
-        a += 1;
-    }
-    if (a) {
-        var t;
-    }else {
-        var e;
-    }
-    for (var i = 'a'; i <= 'z'; i += 1) {}
+var a = getint();
+var b = getint();
+while (a != 0) {
+    b %= a;
+    var c = a;
+    a = b;
+    b = c;
 }
+putint(b);
+putchar('\n');
