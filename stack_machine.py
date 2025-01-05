@@ -429,7 +429,7 @@ class StackMachine:
                 code += self.load_constant(0, False)
 
         initialize(shape, 0)
-        return code + '\n ' if debug else code
+        return code + '\n' if debug else code
 
     def multi_dim_load(self, pos, shape, debug=False):
         assert 0 < pos

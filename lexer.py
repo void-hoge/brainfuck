@@ -8,13 +8,14 @@ from enum import IntEnum, auto
 class Token(IntEnum):
     ID = auto()  # abc
     INT = auto()  # 123
+    CHAR = auto()  # 'a'
     KW_WHILE = auto()  # while
     KW_IF = auto()  # if
     KW_ELSE = auto()  # else
+    KW_FOR = auto()  # for
     KW_VAR = auto()  # var
     KW_ARR = auto()  # arr
-    KW_GET = auto()  # get
-    KW_PUT = auto()  # put
+    KW_FN = auto()  # fn
     KW_RETURN = auto()  # return
     AND = auto()  # &
     OR = auto()  # |
@@ -25,6 +26,11 @@ class Token(IntEnum):
     SLASH = auto()  # /
     PERCENT = auto()  # %
     ASSIGN = auto()  # =
+    ADDASSIGN = auto()  # +=
+    SUBASSIGN = auto()  # -=
+    MULASSIGN = auto()  # *=
+    DIVASSIGN = auto()  # /=
+    MODASSIGN = auto()  # %=
     EQ = auto()  # ==
     NEQ = auto()  # !=
     GT = auto()  # >
@@ -39,7 +45,7 @@ class Token(IntEnum):
     RBRACE = auto()  # }
     LBRACK = auto()  # [
     RBRACK = auto()  # ]
-    EOF = auto()
+    EOF = auto()  # end of file
 
 
 class Lexer:
@@ -48,7 +54,7 @@ class Lexer:
         self.pos = 0
         self.readingpos = 0
         self.tokens = []
-        self.linecount = 1
+        self.linecount = 0
         self.analyze()
 
     def skipspace(self):
@@ -61,13 +67,15 @@ class Lexer:
         if match := re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)', self.string[self.pos :]):
             head = match.group(1)
             self.pos += len(head)
-            if head in ['while', 'if', 'else', 'var', 'arr', 'return']:
+            if head in ['while', 'if', 'else', 'for', 'var', 'arr', 'fn', 'return']:
                 t = {
                     'while': Token.KW_WHILE,
                     'if': Token.KW_IF,
                     'else': Token.KW_ELSE,
+                    'for': Token.KW_FOR,
                     'var': Token.KW_VAR,
                     'arr': Token.KW_ARR,
+                    'fn': Token.KW_FN,
                     'return': Token.KW_RETURN,
                 }[head]
                 return {
@@ -94,8 +102,12 @@ class Lexer:
                 'line': self.linecount,
                 'token': head,
             }
+        elif match := re.match(r"^'([^'\\]|\\[abfnrtv'\"\\?0-7]|\\x[0-9A-Fa-f]{1,2})'", self.string[self.pos :]):
+            head = match.group(1)
+            self.pos += len(head) + 2
+            return {'type': Token.CHAR, 'val': ord(eval(f"'{head}'")), 'line': self.linecount, 'token': f"'{head}'"}
         elif match := re.match(
-            r'^(&|\||!=|!|\+|-|\*|\/|%|==|=|>=|<=|>|<|,|;|\(|\)|\{|\}|\[|\])',
+            r'^(&|\||!=|!|\+=|\+|-=|-|\*=|\*|\/=|\/|%=|%|==|=|>=|<=|>|<|,|;|\(|\)|\{|\}|\[|\])',
             self.string[self.pos :],
         ):
             head = match.group(1)
@@ -110,6 +122,11 @@ class Lexer:
                 '/': Token.SLASH,
                 '%': Token.PERCENT,
                 '=': Token.ASSIGN,
+                '+=': Token.ADDASSIGN,
+                '-=': Token.SUBASSIGN,
+                '*=': Token.MULASSIGN,
+                '/=': Token.DIVASSIGN,
+                '%=': Token.MODASSIGN,
                 '==': Token.EQ,
                 '!=': Token.NEQ,
                 '>': Token.GT,
@@ -160,6 +177,7 @@ class Lexer:
 
 if __name__ == '__main__':
     with open(sys.argv[1]) as f:
-        lex = Lexer(f.read())
-    for token in lex.tokens:
-        print(token)
+        lex = LexicalAnalyzer(f.read())
+    lex.analyze()
+    for i, token in enumerate(lex.tokens):
+        print(i, token)

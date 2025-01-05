@@ -1,5 +1,5 @@
-a = getint();
-b = getint();
+var a = getint();
+var b = getint();
 putchar('G');
 putchar('C');
 putchar('D');
@@ -14,7 +14,9 @@ putchar('=');
 putchar(' ');
 while (a != 0) {
     b %= a;
-    swap(a, b);
+    var c = b;
+    b = a;
+    a = c;
 }
 putint(b);
 putchar('\n');

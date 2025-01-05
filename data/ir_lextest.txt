@@ -1,9 +1,0 @@
-
-
-
-a b c abc ABC x123 x123Yx4
-while if else var arr return
-1 2 12 123 0123 01234
-;, () {} []
-&|!+-*/%= == != > >= < <=
-

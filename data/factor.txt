@@ -1,14 +1,13 @@
-num = 2;
-for (num = 2; num != 0; num += 1) {
-    factors[7];
-    div = 2;
-    count = 0;
+for (var num = 2; num != 0; num += 1) {
+    arr factors[7];
+    var div = 2;
+    var count = 0;
     putint(num);
     putchar(' ');
     putchar('=');
     putchar(' ');
 
-    for (target = num; target != 1;) {
+    for (var target = num; target != 1;) {
         if (target % div) {
             div += 1;
         } else {
@@ -17,8 +16,7 @@ for (num = 2; num != 0; num += 1) {
             count += 1;
         }
     }
-
-    for (i = 0; i < count; i += 1) {
+    for (var i = 0; i < count; i += 1) {
         putint(factors[i]);
         if (i + 1 != count) {
             putchar(' ');

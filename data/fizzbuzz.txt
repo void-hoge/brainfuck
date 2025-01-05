@@ -1,27 +1,22 @@
-fizzarr[5];
-fizzarr[0] = 'F';
-fizzarr[1] = 'i';
-fizzarr[2] = 'z';
-fizzarr[3] = 'z';
-buzzarr[5];
-buzzarr[0] = 'B';
-buzzarr[1] = 'u';
-buzzarr[2] = 'z';
-buzzarr[3] = 'z';
-
-for (num = 1; num != 0; num += 1){
-    fizz = num % 3 == 0;
-    buzz = num % 5 == 0;
-    nofizzbuzz = !(fizz | buzz);
+for (var num = 1; num != 0; num += 1){
+    var fizz = num % 3 == 0;
+    var buzz = num % 5 == 0;
+    var nofizzbuzz = !(fizz | buzz);
     if (nofizzbuzz) {
         putint(num);
     }
     if (fizz) {
-        putarr(fizzarr);
+        putchar('f');
+        putchar('i');
+        putchar('z');
+        putchar('z');
     }
     if (buzz) {
-        putarr(buzzarr);
+        putchar('b');
+        putchar('u');
+        putchar('z');
+        putchar('z');
     }
-    putchar(' ');
+    putchar('\n');
 }
 putchar('\n');
