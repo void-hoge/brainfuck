@@ -78,7 +78,7 @@ class TestStackMachine(unittest.TestCase):
         code += sm.load_constant(ord('b'))
         code += sm.load_constant(ord('c'))
         code += sm.store_variable(0)
-        out, dp, data = run(code)
+ out, dp, data = run(code)
         self.assertEqual([ord('c'), ord('b'), 0, 0], data)
         self.assertEqual(2, dp)
 
@@ -1133,7 +1133,7 @@ class TestStackMachine(unittest.TestCase):
         length = 6
         sm = StackMachine()
         code = 'sm load hex\n'
-        code += sm.multi_byte_load(length, num, debug)
+        code += sm.load_hex(length, num, debug)
         out, dp, data = run(code, dump=dump)
         self.assertEqual(
             list(ord(ch) - ord('a') + 10 if ch in 'abcdef' else int(ch) for ch in f'{num:0{length}x}') + [0],

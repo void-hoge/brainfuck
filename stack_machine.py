@@ -183,7 +183,7 @@ class StackMachine:
 
     def begin_while(self, debug=False):
         assert 0 < self.dp
-        self.controlstack += [(('while'), self.dp)]
+        self.controlstack += [('while', self.dp)]
         code = 'beginwhile: ' if debug else ''
         code += '<[[-]'
         self.dp -= 1
@@ -196,7 +196,7 @@ class StackMachine:
         _, dp = self.controlstack.pop()
         code = 'endwhile: ' if debug else ''
         code += '<]'
-        self.dp = dp - 1
+        self.dp -= 1
         return code + '\n' if debug else code
 
     def greater_than(self, debug=False):
@@ -234,14 +234,10 @@ class StackMachine:
     def modulo(self, debug=False):
         assert 1 < self.dp
         code = 'mod: ' if debug else ''
-        code += '<<'
-        code += multi_dst_add([2, 3])
-        code += '>>>'
-        code += multi_dst_add([-3])
-        code += '<<'
-        code += multi_dst_add([2, 3])
-        code += '>>>'
-        code += multi_dst_add([-3])
+        code += '<<[->>+>+<<<]'
+        code += '>>>[-<<<+>>>]'
+        code += '<<[->>+>+<<<]'
+        code += '>>>[-<<<+>>>]'
         self.dp += 1
         code += self.greater_or_equal()
         code += '<'
@@ -260,14 +256,10 @@ class StackMachine:
     def divide(self, debug=False):
         assert 1 < self.dp
         code = 'div: ' if debug else ''
-        code += '<<'
-        code += multi_dst_add([3, 4])
-        code += '>>>>'
-        code += multi_dst_add([-4])
-        code += '<<<'
-        code += multi_dst_add([3, 4])
-        code += '>>>>'
-        code += multi_dst_add([-4]) + ''
+        code += '<<[->>>+>+<<<<]'
+        code += '>>>>[-<<<<+>>>>]'
+        code += '<<<[->>>+>+<<<<]'
+        code += '>>>>[-<<<<+>>>>]'
         self.dp += 1
         code += self.greater_or_equal()
         code += '<'
@@ -295,7 +287,7 @@ class StackMachine:
     def begin_else(self, debug=False):
         assert self.controlstack
         assert self.controlstack[-1][0] == 'if'
-        assert self.controlstack[-1][1] < self.dp
+        assert self.controlstack[-1][1] == self.dp - 1
         _, dp = self.controlstack.pop()
         self.controlstack += [('else', dp)]
         code = 'beginelse: ' if debug else ''
@@ -307,7 +299,7 @@ class StackMachine:
     def end_if(self, debug=False):
         assert self.controlstack
         assert self.controlstack[-1][0] == 'else'
-        assert self.controlstack[-1][1] < self.dp
+        assert self.controlstack[-1][1] == self.dp - 1
         _, dp = self.controlstack.pop()
         code = 'endif: ' if debug else ''
         code += '[-]<' * (self.dp - dp)
@@ -436,7 +428,7 @@ class StackMachine:
         assert len(shape) < self.dp
         assert pos <= self.dp
         rpos = pos - self.dp
-        code = f'mdl {pos} ({"".join(map(str, shape))}): ' if debug else ''
+        code = f'mdl {pos} ({" ".join(map(str, shape))}): ' if debug else ''
         for s in shape:
             code += '<'
             code += multi_dst_add([rpos - 1])

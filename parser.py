@@ -307,10 +307,6 @@ class StInitVariable(Statement):
             raise SyntaxError(f'Variable named "{self.name}" is already used in this context.')
         tables[-1][self.name] = {'type': 'variable', 'pos': sm.dp, 'size': 1}
         code = sm.load_constant(0, debug)
-        # if self.rhs:
-        #     code += self.rhs.codegen(sm, tables, debug)
-        # else:
-        #     code += sm.load_constant(0, debug)
         return code
 
 
