@@ -196,7 +196,7 @@ class StackMachine:
         _, dp = self.controlstack.pop()
         code = 'endwhile: ' if debug else ''
         code += '<]'
-        self.dp -= 1
+        self.dp = dp - 1
         return code + '\n' if debug else code
 
     def greater_than(self, debug=False):
