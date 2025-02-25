@@ -1,4 +1,6 @@
 arr grid[9][9];
+
+// 問題入力
 for (var i = 0; i < 9; i += 1) {
     for (var j = 0; j < 9; j += 1) {
         var c = getchar();
@@ -10,12 +12,15 @@ for (var i = 0; i < 9; i += 1) {
     }
 }
 
+// 問題表示
 for (var i = 0; i < 9; i += 1) {
     if (i % 3 == 0) {
         putchar('+');
         for (var j = 0; j < 3; j += 1) {
+            putchar('-');
             for (var k = 0; k < 3; k += 1) {
-                putchar('-'); putchar('-');
+                putchar('-');
+                putchar('-');
             }
             putchar('+');
         }
@@ -24,6 +29,7 @@ for (var i = 0; i < 9; i += 1) {
     for (var j = 0; j < 9; j += 1) {
         if (j % 3 == 0) {
             putchar('|');
+            putchar(' ');
         }
         if (grid[i][j] == 0) {
             putchar(' ');
@@ -37,12 +43,16 @@ for (var i = 0; i < 9; i += 1) {
 }
 putchar('+');
 for (var i = 0; i < 3; i += 1) {
+    putchar('-');
     for (var j = 0; j < 3; j += 1) {
-        putchar('-'); putchar('-');
+        putchar('-');
+        putchar('-');
     }
     putchar('+');
 }
 putchar('\n');
+
+// 前処理
 arr emptycells[2][9 * 9];
 var numempty = 0;
 for (var row = 0; row < 9; row += 1) {
@@ -54,6 +64,8 @@ for (var row = 0; row < 9; row += 1) {
         }
     }
 }
+
+// メイン処理
 arr triednumbers[9 * 9];
 var k = 0;
 while (k != 255 & k < numempty) {
@@ -107,12 +119,15 @@ while (k != 255 & k < numempty) {
         k -= 1;
     }
 }
+// メイン処理ここまで
 
-if (k == numempty) {
+if (k == numempty) { // 解を発見
+    // 解を表示
     for (var i = 0; i < 9; i += 1) {
         if (i % 3 == 0) {
             putchar('+');
             for (var j = 0; j < 3; j += 1) {
+                putchar('-');
                 for (var k = 0; k < 3; k += 1) {
                     putchar('-');
                     putchar('-');
@@ -124,6 +139,7 @@ if (k == numempty) {
         for (var j = 0; j < 9; j += 1) {
             if (j % 3 == 0) {
                 putchar('|');
+                putchar(' ');
             }
             if (grid[i][j] == 0) {
                 putchar(' ');
@@ -137,13 +153,14 @@ if (k == numempty) {
     }
     putchar('+');
     for (var i = 0; i < 3; i += 1) {
+        putchar('-');
         for (var j = 0; j < 3; j += 1) {
             putchar('-'); putchar('-');
         }
         putchar('+');
     }
     putchar('\n');
-} else {
+} else { // 解なし
     putchar('n');
     putchar('o');
     putchar(' ');

@@ -291,8 +291,7 @@ class StackMachine:
         _, dp = self.controlstack.pop()
         self.controlstack += [('else', dp)]
         code = 'beginelse: ' if debug else ''
-        code += '[-]<' * (self.dp - dp + 1)
-        code += ']>[->'
+        code += '<<]>[->'
         self.dp = dp + 1
         return code + '\n' if debug else code
 
@@ -302,8 +301,7 @@ class StackMachine:
         assert self.controlstack[-1][1] == self.dp - 1
         _, dp = self.controlstack.pop()
         code = 'endif: ' if debug else ''
-        code += '[-]<' * (self.dp - dp)
-        code += ']<'
+        code += '<]<'
         self.dp = dp - 1
         return code + '\n' if debug else code
 

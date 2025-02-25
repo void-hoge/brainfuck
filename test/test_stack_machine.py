@@ -78,7 +78,7 @@ class TestStackMachine(unittest.TestCase):
         code += sm.load_constant(ord('b'))
         code += sm.load_constant(ord('c'))
         code += sm.store_variable(0)
- out, dp, data = run(code)
+        out, dp, data = run(code)
         self.assertEqual([ord('c'), ord('b'), 0, 0], data)
         self.assertEqual(2, dp)
 
