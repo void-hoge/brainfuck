@@ -50,12 +50,38 @@ class Token(IntEnum):
 
 class Lexer:
     def __init__(self, string):
-        self.string = string
+        self.string = self.ignore_comments(string)
         self.pos = 0
         self.readingpos = 0
         self.tokens = []
         self.linecount = 0
         self.analyze()
+
+    def ignore_comments(self, string):
+        state = 'program'
+        pos = 0
+        result = ''
+        while pos < len(string):
+            if state == 'program':
+                if string[pos : pos + 2] == '//':
+                    state = 'line_comment'
+                    pos += 1
+                elif string[pos : pos + 2] == '/*':
+                    state = 'block_comment'
+                    pos += 1
+                else:
+                    result += string[pos]
+            elif state == 'line_comment':
+                if string[pos : pos + 1] == '\n':
+                    state = 'program'
+            else: # state == 'block_comment'
+                if string[pos : pos + 2] == '*/':
+                    state = 'program'
+                    pos += 1
+            pos += 1
+        if state == 'block_comment':
+            raise SyntaxError('A block comment is not closing.')
+        return result
 
     def skipspace(self):
         while self.pos < len(self.string) and self.string[self.pos] in ' \n\t\r':
@@ -177,7 +203,7 @@ class Lexer:
 
 if __name__ == '__main__':
     with open(sys.argv[1]) as f:
-        lex = LexicalAnalyzer(f.read())
+        lex = Lexer(f.read())
     lex.analyze()
     for i, token in enumerate(lex.tokens):
         print(i, token)
