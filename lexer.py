@@ -15,8 +15,6 @@ class Token(IntEnum):
     KW_FOR = auto()  # for
     KW_VAR = auto()  # var
     KW_ARR = auto()  # arr
-    KW_FN = auto()  # fn
-    KW_RETURN = auto()  # return
     AND = auto()  # &
     OR = auto()  # |
     NOT = auto()  # !
@@ -93,7 +91,7 @@ class Lexer:
         if match := re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)', self.string[self.pos :]):
             head = match.group(1)
             self.pos += len(head)
-            if head in ['while', 'if', 'else', 'for', 'var', 'arr', 'fn', 'return']:
+            if head in ['while', 'if', 'else', 'for', 'var', 'arr']:
                 t = {
                     'while': Token.KW_WHILE,
                     'if': Token.KW_IF,
@@ -101,8 +99,6 @@ class Lexer:
                     'for': Token.KW_FOR,
                     'var': Token.KW_VAR,
                     'arr': Token.KW_ARR,
-                    'fn': Token.KW_FN,
-                    'return': Token.KW_RETURN,
                 }[head]
                 return {
                     'type': t,
