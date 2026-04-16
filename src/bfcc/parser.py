@@ -2,8 +2,8 @@
 
 import sys
 from enum import IntEnum, auto
-from lexer import Token, Lexer
-from stack_machine import *
+from .lexer import Token, Lexer
+from .stack_machine import *
 
 
 

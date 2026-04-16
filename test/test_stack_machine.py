@@ -1,8 +1,8 @@
 #!/usr/bin/env pyton3
 
 import unittest
-from stack_machine import *
-from interpreter import *
+from bfcc.stack_machine import *
+from bfcc.interpreter import *
 import io
 import math
 

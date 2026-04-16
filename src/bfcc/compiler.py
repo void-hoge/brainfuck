@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-from lexer import Lexer
-from parser import Parser
-from stack_machine import StackMachine
+from .lexer import Lexer
+from .parser import Parser
+from .stack_machine import StackMachine
 
 
 class Compiler:
@@ -16,12 +16,11 @@ class Compiler:
         return self.prog.codegen(debug)
 
 
-if __name__ == '__main__':
-    import sys
+def compile_source(text, debug=False):
+    return Compiler(text).codegen(debug)
 
-    with open(sys.argv[1]) as f:
-        prog = f.read()
-    debug = False
-    comp = Compiler(prog)
-    code = comp.codegen(debug)
-    print(code)
+
+if __name__ == '__main__':
+    from .cli import main
+
+    raise SystemExit(main())
