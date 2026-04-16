@@ -1,0 +1,99 @@
+arr cur[20][20];
+arr nxt[20][20];
+
+// Read initial board from stdin.
+// Input format: 20 lines, each with 20 chars ("#" = alive, "." = dead).
+for (var i = 0; i < 20; i += 1) {
+    for (var j = 0; j < 20; j += 1) {
+        var ch = getchar();
+        if (ch == '#') {
+            cur[i][j] = 1;
+        } else {
+            cur[i][j] = 0;
+        }
+    }
+
+    var eol = getchar();
+    while (eol != '\n') {
+        eol = getchar();
+    }
+}
+
+var step = 0;
+var running = 1;
+while (running) {
+    // Draw current board.
+    putint(step);
+    putchar('\n');
+    step += 1;
+    for (var i = 0; i < 20; i += 1) {
+        for (var j = 0; j < 20; j += 1) {
+            if (cur[i][j] == 1) {
+                putchar('#');
+            } else {
+                putchar('.');
+            }
+        }
+        putchar('\n');
+    }
+    putchar('\n');
+
+    // Advance one generation when Enter is pressed.
+    var key = getchar();
+    if (key == '\0') {
+        running = 0;
+    }
+
+    // Compute next board.
+    for (var i = 0; i < 20; i += 1) {
+        for (var j = 0; j < 20; j += 1) {
+            var neighbors = 0;
+
+            if (i > 0 & j > 0) {
+                neighbors += cur[i - 1][j - 1];
+            }
+            if (i > 0) {
+                neighbors += cur[i - 1][j];
+            }
+            if (i > 0 & j < 20 - 1) {
+                neighbors += cur[i - 1][j + 1];
+            }
+            if (j > 0) {
+                neighbors += cur[i][j - 1];
+            }
+            if (j < 20 - 1) {
+                neighbors += cur[i][j + 1];
+            }
+            if (i < 20 - 1 & j > 0) {
+                neighbors += cur[i + 1][j - 1];
+            }
+            if (i < 20 - 1) {
+                neighbors += cur[i + 1][j];
+            }
+            if (i < 20 - 1 & j < 20 - 1) {
+                neighbors += cur[i + 1][j + 1];
+            }
+
+            if (cur[i][j] == 1) {
+                if (neighbors == 2 | neighbors == 3) {
+                    nxt[i][j] = 1;
+                } else {
+                    nxt[i][j] = 0;
+                }
+            } else {
+                if (neighbors == 3) {
+                    nxt[i][j] = 1;
+                } else {
+                    nxt[i][j] = 0;
+                }
+            }
+        }
+    }
+
+    // Copy next board back to current.
+    for (var i = 0; i < 20; i += 1) {
+        for (var j = 0; j < 20; j += 1) {
+            cur[i][j] = nxt[i][j];
+        }
+    }
+}
