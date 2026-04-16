@@ -1,0 +1,75 @@
+// N-Queens (runtime N): print one flattened board per solution
+// Input: N (0 <= N <= MAXN)
+// Arrays are fixed-size, so MAXN is compile-time constant.
+
+var MAXN = 15;
+arr qcol[15];
+arr tried[15];
+
+var N = getint();
+
+if (N < 0 | N > MAXN) {
+    putchar('E');
+    putchar('R');
+    putchar('R');
+    putchar('\n');
+} else {
+    for (var i = 0; i < MAXN; i += 1) {
+        tried[i] = 255;
+    }
+
+    var row = 0;
+    while (row != 255) {
+        var found = 0;
+        var c = tried[row] + 1;
+
+        while (c < N & !found) {
+            var safe = 1;
+            var r = 0;
+
+            while (r < row & safe) {
+                if (qcol[r] == c) {
+                    safe = 0;
+                }
+
+                var d = row - r;
+                if (qcol[r] + d == c) {
+                    safe = 0;
+                }
+                if (c + d == qcol[r]) {
+                    safe = 0;
+                }
+
+                r += 1;
+            }
+
+            if (safe) {
+                qcol[row] = c;
+                tried[row] = c;
+                found = 1;
+                row += 1;
+            } else {
+                c += 1;
+            }
+        }
+
+        if (!found) {
+            tried[row] = 255;
+            row -= 1;
+        }
+
+        if (row == N) {
+            for (var i = 0; i < N; i += 1) {
+                for (var j = 0; j < N; j += 1) {
+                    if (qcol[i] == j) {
+                        putchar('q');
+                    } else {
+                        putchar('.');
+                    }
+                }
+            }
+            putchar('\n');
+            row -= 1;
+        }
+    }
+}

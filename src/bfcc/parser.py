@@ -2,8 +2,8 @@
 
 import sys
 from enum import IntEnum, auto
-from lexer import Token, Lexer
-from stack_machine import *
+from .lexer import Token, Lexer
+from .stack_machine import *
 
 
 
@@ -628,6 +628,8 @@ class Parser:
                 inits += [self.parse_init_variable(tables + [lvars], tail=None, enable_init=True)]
             elif self.peek()['type'] == Token.KW_ARR:
                 inits += [self.parse_init_array(tables + [lvars], tail=None)]
+            elif self.peek()['type'] == Token.ID:
+                inits += [self.parse_assignment(tables + [lvars], tail=None)]
             else:
                 raise SyntaxError(
                     f'Expected {repr(Token.KW_VAR)} or {repr(Token.KW_ARR)}, got {repr(self.peek()["type"])} in line {self.peek()["line"] + 1}.'
@@ -639,6 +641,7 @@ class Parser:
         reinits = []
         while self.peek()['type'] != Token.RPAREN:
             reinits += [self.parse_assignment(tables + [lvars], tail=None)]
+            self.match(Token.COMMA)
         self.expect(Token.RPAREN)
         self.expect(Token.LBRACE)
         body = []
