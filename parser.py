@@ -593,11 +593,7 @@ class Parser:
         statements = []
         tables = [{}]
         while self.peek()['type'] != Token.EOF:
-            if self.peek()['type'] == Token.KW_FN:
-                func = self.parse_function(tables)
-                funcs[func.name] = func
-            else:
-                statements += [self.parse_statement(tables, False)]
+            statements += [self.parse_statement(tables, False)]
         self.expect(Token.EOF)
         return Program(statements)
 
@@ -693,11 +689,6 @@ class Parser:
             return self.parse_while(tables, enable_return)
         elif self.peek()['type'] == Token.KW_FOR:
             return self.parse_for(tables, enable_return)
-        elif self.peek()['type'] == Token.KW_RETURN:
-            if enable_return:
-                return self.parse_return(tables)
-            else:
-                raise SyntaxError(f'In this context, return is not available, in line {self.peek()["line"] + 1}.')
         elif self.peek()['type'] == Token.ID:
             self.seek()
             if self.peek()['type'] == Token.LPAREN:
@@ -755,12 +746,6 @@ class Parser:
         if tail:
             self.expect(tail)
         return StInitArray(name, shape)
-
-    def parse_return(self, tables):
-        self.expect(Token.KW_RETURN)
-        expr = self.parse_expression(tables)
-        self.expect(Token.SEMICOLON)
-        return StReturn(expr)
 
     def parse_left_expression(self, tables):
         token = self.peek()
