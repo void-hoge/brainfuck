@@ -641,6 +641,7 @@ class Parser:
         reinits = []
         while self.peek()['type'] != Token.RPAREN:
             reinits += [self.parse_assignment(tables + [lvars], tail=None)]
+            self.match(Token.COMMA)
         self.expect(Token.RPAREN)
         self.expect(Token.LBRACE)
         body = []
